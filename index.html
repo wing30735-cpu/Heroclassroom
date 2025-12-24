@@ -618,9 +618,10 @@
             };
 
             const activeCourse = courses.find(c => c.id === activeCourseId) || courses[0];
-            const activeBoss = BOSS_DEFINITIONS.find(b => b.id === activeCourse.bossId) || BOSS_DEFINITIONS[0];
+            // Guard against undefined activeCourse
+            const activeBoss = activeCourse ? (BOSS_DEFINITIONS.find(b => b.id === activeCourse.bossId) || BOSS_DEFINITIONS[0]) : null;
             const totalCP = activeCourse?.students.reduce((acc, curr) => acc + curr.cp, 0) || 0;
-            const damagePercent = Math.min((totalCP / activeBoss.hp) * 100, 100);
+            const damagePercent = activeBoss ? Math.min((totalCP / activeBoss.hp) * 100, 100) : 0;
             const isDefeated = damagePercent >= 100;
 
             const getJobInfo = (jobId) => JOB_DEFINITIONS.find(j => j.id === jobId) || JOB_DEFINITIONS[0];
@@ -780,6 +781,24 @@
                 });
             };
 
+            // NEW: Handle Delete Course
+            const handleDeleteCourse = (courseId, e) => {
+                e.stopPropagation();
+                handleAdminCheck(() => {
+                    showConfirm("確定要刪除此副本嗎？此操作無法復原！", () => {
+                        setCourses(prevCourses => {
+                            const newCourses = prevCourses.filter(c => c.id !== courseId);
+                            // If we deleted the active course, switch to another one or clear it
+                            if (activeCourseId === courseId) {
+                                setActiveCourseId(newCourses.length > 0 ? newCourses[0].id : null);
+                            }
+                            return newCourses;
+                        });
+                        showAlert("副本已刪除");
+                    });
+                });
+            };
+
             const openShop = (student, e) => { e.stopPropagation(); setTargetStudent(student); setIsShopModalOpen(true); };
             const openBuffModal = (student) => { setTargetStudent(student); setIsBuffModalOpen(true); };
             const openInventoryViewer = (student) => { setTargetStudent(student); setIsInventoryViewerOpen(true); };
@@ -805,7 +824,7 @@
 
             const handleOpenChest = () => { setIsChestOpen(true); setTimeout(() => setShowRewardModal(true), 1000); };
             const handleDamage = (studentId, e) => { e.stopPropagation(); setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === studentId ? { ...s, hp: Math.max(0, s.hp - 2) } : s), logs: [`⚠️ ${c.students.find(s => s.id === studentId).name} 受傷 (-2 HP)`, ...c.logs] } : c)); };
-            const handleRemedy = (studentId) => { setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === studentId ? { ...s, hp: Math.max(0, s.hp - 2) } : s), logs: [`❤️‍🩹 ${c.students.find(s => s.id === studentId).name} 復活`, ...c.logs] } : c)); };
+            const handleRemedy = (studentId) => { setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === studentId ? { ...s, hp: MAX_HP } : s), logs: [`❤️‍🩹 ${c.students.find(s => s.id === studentId).name} 復活`, ...c.logs] } : c)); };
 
             const submitNewStudent = () => {
                 handleAdminCheck(() => {
@@ -832,7 +851,7 @@
 
             const handleJobChange = () => { if (!targetStudent) return; setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === targetStudent.id ? { ...s, job: newJobId } : s), logs: [`🔄 ${targetStudent.name} 轉職`, ...c.logs] } : c)); setIsJobChangeModalOpen(false); };
 
-            if (!activeCourse) return <div className="p-10 text-white">載入中...</div>;
+            // REMOVED early return: if (!activeCourse) return ...
 
             return (
                 <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
@@ -877,9 +896,21 @@
                             {courses.map(course => {
                                 const CourseIcon = window.LucideIcons[course.icon] || window.LucideIcons.HelpCircle;
                                 return (
-                                <button key={course.id} onClick={() => setActiveCourseId(course.id)} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeCourseId === course.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}>
-                                    <span className="shrink-0"><CourseIcon size={18} /></span>{isSidebarOpen && <div className="flex-1 min-w-0"><div className="font-medium truncate">{course.name}</div></div>}
-                                </button>
+                                <div key={course.id} className={`group relative flex items-center w-full rounded-lg transition-colors ${activeCourseId === course.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}>
+                                    <button onClick={() => setActiveCourseId(course.id)} className="flex-1 text-left p-3 flex items-center gap-3 overflow-hidden">
+                                        <span className="shrink-0"><CourseIcon size={18} /></span>
+                                        {isSidebarOpen && <div className="flex-1 min-w-0"><div className="font-medium truncate">{course.name}</div></div>}
+                                    </button>
+                                    {isSidebarOpen && isAdminMode && (
+                                        <button
+                                            onClick={(e) => handleDeleteCourse(course.id, e)}
+                                            className="absolute right-2 p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-900/50 rounded transition-all"
+                                            title="刪除副本"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             )})}
                         </div>
                         {isSidebarOpen && <div className="p-4 border-t border-slate-700 flex gap-2"><input type="text" placeholder="新副本..." className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs" value={newCourseName} onChange={(e) => setNewCourseName(e.target.value)} /><button onClick={handleAddCourse} className="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded"><PlusCircle size={16} /></button></div>}
@@ -887,180 +918,214 @@
 
                     {/* Main Content */}
                     <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-                        <header className="bg-slate-900 border-b border-slate-800 shadow-xl p-0 relative overflow-hidden shrink-0">
-                            <div className={`absolute inset-0 opacity-20 ${isDefeated ? 'bg-yellow-600' : 'bg-red-900'}`}></div>
-                            <div className="max-w-6xl mx-auto p-4 relative z-10">
-                                <div className="flex flex-col md:flex-row items-center gap-6">
-                                    <div className="relative cursor-pointer group shrink-0" onClick={openBossModal}>
-                                        <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 flex items-center justify-center text-6xl shadow-2xl transition-transform transform group-hover:scale-105 ${isDefeated ? 'bg-yellow-900/50 border-yellow-500 grayscale' : 'bg-red-900/50 border-red-500'}`}>{isDefeated ? '💀' : activeBoss.avatar}</div>
-                                        {!isDefeated && <div className="absolute -bottom-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold animate-bounce">BOSS</div>}
-                                        <div className="absolute top-0 right-0 bg-slate-800 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">
-                                            {isAdminMode ? <Edit size={12} className="text-white" /> : <Lock size={12} className="text-slate-400" />}
+                        {activeCourse ? (
+                            <>
+                                <header className="bg-slate-900 border-b border-slate-800 shadow-xl p-0 relative overflow-hidden shrink-0">
+                                    <div className={`absolute inset-0 opacity-20 ${isDefeated ? 'bg-yellow-600' : 'bg-red-900'}`}></div>
+                                    <div className="max-w-6xl mx-auto p-4 relative z-10">
+                                        <div className="flex flex-col md:flex-row items-center gap-6">
+                                            <div className="relative cursor-pointer group shrink-0" onClick={openBossModal}>
+                                                <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 flex items-center justify-center text-6xl shadow-2xl transition-transform transform group-hover:scale-105 ${isDefeated ? 'bg-yellow-900/50 border-yellow-500 grayscale' : 'bg-red-900/50 border-red-500'}`}>{isDefeated ? '💀' : activeBoss.avatar}</div>
+                                                {!isDefeated && <div className="absolute -bottom-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold animate-bounce">BOSS</div>}
+                                                <div className="absolute top-0 right-0 bg-slate-800 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">
+                                                    {isAdminMode ? <Edit size={12} className="text-white" /> : <Lock size={12} className="text-slate-400" />}
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 w-full">
+                                                <div className="flex justify-between items-end mb-2">
+                                                    <div><h2 className="text-2xl font-black text-white flex items-center gap-2 drop-shadow-md">{activeBoss.name} <span className="text-xs px-2 py-0.5 rounded border border-red-500 text-red-500">{activeBoss.difficulty}</span></h2><p className="text-slate-400 text-sm mt-1">{activeBoss.desc}</p></div>
+                                                    <div className="text-right"><div className="text-3xl font-mono font-bold text-white tracking-tighter">{totalCP} <span className="text-sm text-slate-500">/ {activeBoss.hp} CP</span></div></div>
+                                                </div>
+                                                <div className="h-6 bg-slate-800 rounded-full overflow-hidden border border-slate-700 relative shadow-inner">
+                                                    <div className={`h-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 ${isDefeated ? 'bg-yellow-500' : 'bg-gradient-to-r from-red-600 to-red-400'}`} style={{ width: `${damagePercent}%` }}></div>
+                                                </div>
+                                            </div>
+                                            <div className="shrink-0 flex flex-col items-center justify-center w-24">
+                                                {isDefeated ? <button onClick={handleOpenChest} className="animate-bounce text-5xl">{isChestOpen ? '💰' : '🎁'}</button> : <div className="opacity-30 grayscale flex flex-col items-center"><div className="text-5xl">🔒</div><span className="text-xs text-slate-500">上鎖</span></div>}
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex-1 w-full">
-                                        <div className="flex justify-between items-end mb-2">
-                                            <div><h2 className="text-2xl font-black text-white flex items-center gap-2 drop-shadow-md">{activeBoss.name} <span className="text-xs px-2 py-0.5 rounded border border-red-500 text-red-500">{activeBoss.difficulty}</span></h2><p className="text-slate-400 text-sm mt-1">{activeBoss.desc}</p></div>
-                                            <div className="text-right"><div className="text-3xl font-mono font-bold text-white tracking-tighter">{totalCP} <span className="text-sm text-slate-500">/ {activeBoss.hp} CP</span></div></div>
-                                        </div>
-                                        <div className="h-6 bg-slate-800 rounded-full overflow-hidden border border-slate-700 relative shadow-inner">
-                                            <div className={`h-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 ${isDefeated ? 'bg-yellow-500' : 'bg-gradient-to-r from-red-600 to-red-400'}`} style={{ width: `${damagePercent}%` }}></div>
-                                        </div>
-                                    </div>
-                                    <div className="shrink-0 flex flex-col items-center justify-center w-24">
-                                        {isDefeated ? <button onClick={handleOpenChest} className="animate-bounce text-5xl">{isChestOpen ? '💰' : '🎁'}</button> : <div className="opacity-30 grayscale flex flex-col items-center"><div className="text-5xl">🔒</div><span className="text-xs text-slate-500">上鎖</span></div>}
-                                    </div>
-                                </div>
-                            </div>
-                        </header>
+                                </header>
 
-                        <div className="flex-1 overflow-y-auto p-4 pb-6 scrollbar-thin scrollbar-thumb-slate-600">
-                            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <div className="md:col-span-2 space-y-6">
-                                    <button onClick={() => setIsStudentModalOpen(true)} className="w-full bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 p-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"><PlusCircle size={20} /> 召喚新英雄</button>
+                                <div className="flex-1 overflow-y-auto p-4 pb-6 scrollbar-thin scrollbar-thumb-slate-600">
+                                    <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="md:col-span-2 space-y-6">
+                                            <button onClick={() => setIsStudentModalOpen(true)} className="w-full bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 p-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"><PlusCircle size={20} /> 召喚新英雄</button>
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {activeCourse.students.map(student => {
-                                            const job = getJobInfo(student.job);
-                                            const isDead = student.hp <= 0;
-                                            const highestRarity = getHighestRarity(student.inventory);
-                                            const rarityStyle = RARITY_STYLES[highestRarity];
-                                            const AvatarComponent = job.AvatarComponent || WarriorAvatar;
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {activeCourse.students.map(student => {
+                                                    const job = getJobInfo(student.job);
+                                                    const isDead = student.hp <= 0;
+                                                    const highestRarity = getHighestRarity(student.inventory);
+                                                    const rarityStyle = RARITY_STYLES[highestRarity];
+                                                    const AvatarComponent = job.AvatarComponent || WarriorAvatar;
 
-                                            return (
-                                                <div key={student.id} onClick={() => openInventoryViewer(student)} className={`cursor-pointer bg-slate-800 rounded-xl p-4 border shadow-md transition-all group relative h-full flex flex-col justify-between ${isDead ? 'border-red-500/50 opacity-80' : 'border-slate-700 hover:border-indigo-500 hover:shadow-indigo-500/20'}`}>
-                                                    {isDead && (
-                                                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl flex-col gap-3 p-4 text-center animate-fadeIn">
-                                                            <div className="text-red-500 font-black flex items-center gap-2 text-xl animate-bounce">
-                                                                <Skull size={28} /> 力竭倒地
-                                                            </div>
-                                                            <p className="text-slate-400 text-xs font-medium">
-                                                                請完成指定任務以復活
-                                                            </p>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleRemedy(student.id); }}
-                                                                className="bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg shadow-green-900/20 transition-all hover:scale-105 border border-green-400/30"
-                                                            >
-                                                                <Bandage size={14} /> 確認復活
-                                                            </button>
-                                                        </div>
-                                                    )}
-
-                                                    <div className="flex-1">
-                                                        <div className="flex items-start gap-4">
-                                                            <div className={`w-14 h-14 rounded-lg flex items-center justify-center relative shrink-0 border-2 overflow-hidden bg-slate-900 ${rarityStyle.border} ${rarityStyle.shadow} transition-all duration-500`}>
-                                                                <AvatarComponent className="w-full h-full" isAnimated={false} />
-                                                            </div>
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div><h3 className="text-base font-bold truncate text-white flex items-center gap-1">{student.name} <Search size={12} className="text-slate-500" /></h3><div className="text-xs text-indigo-300">LV.{student.lv} {job.name}</div></div>
-                                                                    <div className="text-right">
-                                                                        <div className="text-yellow-400 font-bold text-xs flex items-center justify-end gap-1"><Award size={12} /> {student.cp}</div>
-                                                                        <div className="text-green-400 font-bold text-xs flex items-center justify-end gap-1 mt-0.5"><Coins size={12} /> {student.gp}</div>
-
-                                                                        {!isDead && (
-                                                                            <button
-                                                                                onClick={(e) => openShop(student, e)}
-                                                                                className="mt-2 bg-gradient-to-b from-amber-500 to-amber-700 border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md hover:scale-110 flex items-center justify-center gap-1 w-full"
-                                                                            >
-                                                                                <ShoppingBag size={10} /> 商店
-                                                                            </button>
-                                                                        )}
+                                                    return (
+                                                        <div key={student.id} onClick={() => openInventoryViewer(student)} className={`cursor-pointer bg-slate-800 rounded-xl p-4 border shadow-md transition-all group relative h-full flex flex-col justify-between ${isDead ? 'border-red-500/50 opacity-80' : 'border-slate-700 hover:border-indigo-500 hover:shadow-indigo-500/20'}`}>
+                                                            {isDead && (
+                                                                <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl flex-col gap-3 p-4 text-center animate-fadeIn">
+                                                                    <div className="text-red-500 font-black flex items-center gap-2 text-xl animate-bounce">
+                                                                        <Skull size={28} /> 力竭倒地
                                                                     </div>
+                                                                    <p className="text-slate-400 text-xs font-medium">
+                                                                        請完成指定任務以復活
+                                                                    </p>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleRemedy(student.id); }}
+                                                                        className="bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg shadow-green-900/20 transition-all hover:scale-105 border border-green-400/30"
+                                                                    >
+                                                                        <Bandage size={14} /> 確認復活
+                                                                    </button>
                                                                 </div>
+                                                            )}
 
-                                                                <div className="mt-1 mb-1">
-                                                                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold px-0.5">
-                                                                        <span>EXP</span>
-                                                                        <span>{student.xp}/{student.maxXp}</span>
+                                                            <div className="flex-1">
+                                                                <div className="flex items-start gap-4">
+                                                                    <div className={`w-14 h-14 rounded-lg flex items-center justify-center relative shrink-0 border-2 overflow-hidden bg-slate-900 ${rarityStyle.border} ${rarityStyle.shadow} transition-all duration-500`}>
+                                                                        <AvatarComponent className="w-full h-full" isAnimated={false} />
                                                                     </div>
-                                                                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 relative group/xp" title={`經驗值: ${student.xp}/${student.maxXp}`}>
-                                                                        <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${(student.xp / student.maxXp) * 100}%` }} />
-                                                                    </div>
-                                                                </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <div className="flex justify-between items-start">
+                                                                            <div>
+                                                                                <h3 className="text-base font-bold truncate text-white flex items-center gap-1">{student.name} <Search size={12} className="text-slate-500" /></h3>
+                                                                                
+                                                                                {/* Job Tooltip Added Here */}
+                                                                                <div className="relative group/job w-fit">
+                                                                                    <div className="text-xs text-indigo-300 border-b border-dashed border-indigo-500/30 cursor-help">LV.{student.lv} {job.name}</div>
+                                                                                    <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-900 text-white text-xs rounded border border-indigo-500 shadow-xl opacity-0 group-hover/job:opacity-100 transition-opacity pointer-events-none z-50">
+                                                                                        <div className="font-bold text-indigo-400 mb-1 flex items-center gap-1">{job.icon} {job.name}</div>
+                                                                                        <div className="mb-2 text-slate-300 leading-tight">{job.desc}</div>
+                                                                                        <div className="text-yellow-400 text-[10px] bg-yellow-900/30 p-1 rounded border border-yellow-700/50">✨ {job.bonusText}</div>
+                                                                                    </div>
+                                                                                </div>
 
-                                                                <div className="flex items-center gap-2">
-                                                                    <Heart size={10} className="text-red-400 shrink-0" />
-                                                                    <div className="flex-1 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700 relative"><div className={`h-full ${student.hp <= 3 ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`} style={{ width: `${(student.hp / student.maxHp) * 100}%` }} /></div>
-                                                                    <button onClick={(e) => handleDamage(student.id, e)} disabled={isDead} className="text-slate-500 hover:text-red-400 hover:scale-110 p-1"><Activity size={12} /></button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
+                                                                            </div>
+                                                                            <div className="text-right">
+                                                                                <div className="text-yellow-400 font-bold text-xs flex items-center justify-end gap-1"><Award size={12} /> {student.cp}</div>
+                                                                                <div className="text-green-400 font-bold text-xs flex items-center justify-end gap-1 mt-0.5"><Coins size={12} /> {student.gp}</div>
 
-                                                        <div className="mt-3 h-8 flex gap-1 items-center overflow-x-auto scrollbar-hide">
-                                                            {student.buffs?.length > 0 ? (
-                                                                student.buffs.map((buff, i) => {
-                                                                    const d = getBuffInfo(buff.id);
-                                                                    return (
-                                                                        <div key={`b-${i}`} className="shrink-0 bg-slate-900/80 px-1.5 py-0.5 text-[9px] rounded text-slate-300 flex items-center gap-1 border border-slate-700 shadow-sm">
-                                                                            {renderItemIcon(d.iconType, "w-3 h-3 inline mr-1")} {d.name} x{buff.charges}
+                                                                                {!isDead && (
+                                                                                    <button
+                                                                                        onClick={(e) => openShop(student, e)}
+                                                                                        className="mt-2 bg-gradient-to-b from-amber-500 to-amber-700 border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md hover:scale-110 flex items-center justify-center gap-1 w-full"
+                                                                                    >
+                                                                                        <ShoppingBag size={10} /> 商店
+                                                                                    </button>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
-                                                                    );
-                                                                })
-                                                            ) : (
-                                                                <span className="text-[9px] text-slate-600 italic px-1">無狀態</span>
+
+                                                                        <div className="mt-1 mb-1">
+                                                                            <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold px-0.5">
+                                                                                <span>EXP</span>
+                                                                                <span>{student.xp}/{student.maxXp}</span>
+                                                                            </div>
+                                                                            <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 relative group/xp" title={`經驗值: ${student.xp}/${student.maxXp}`}>
+                                                                                <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${(student.xp / student.maxXp) * 100}%` }} />
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Heart size={10} className="text-red-400 shrink-0" />
+                                                                            <div className="flex-1 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700 relative"><div className={`h-full ${student.hp <= 3 ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`} style={{ width: `${(student.hp / student.maxHp) * 100}%` }} /></div>
+                                                                            <button onClick={(e) => handleDamage(student.id, e)} disabled={isDead} className="text-slate-500 hover:text-red-400 hover:scale-110 p-1"><Activity size={12} /></button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="mt-3 h-8 flex gap-1 items-center overflow-x-auto scrollbar-hide">
+                                                                    {student.buffs?.length > 0 ? (
+                                                                        student.buffs.map((buff, i) => {
+                                                                            const d = getBuffInfo(buff.id);
+                                                                            return (
+                                                                                <div key={`b-${i}`} className="shrink-0 bg-slate-900/80 px-1.5 py-0.5 text-[9px] rounded text-slate-300 flex items-center gap-1 border border-slate-700 shadow-sm relative group/buff cursor-help">
+                                                                                    {renderItemIcon(d.iconType, "w-3 h-3 inline mr-1")} {d.name} x{buff.charges}
+                                                                                    
+                                                                                    {/* Buff Tooltip */}
+                                                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/buff:opacity-100 pointer-events-none z-50 border border-slate-600 shadow-xl">
+                                                                                        <div className={`font-bold mb-1 ${d.color}`}>{d.name}</div>
+                                                                                        <div className="text-[10px] text-slate-300 leading-tight">{d.desc}</div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })
+                                                                    ) : (
+                                                                        <span className="text-[9px] text-slate-600 italic px-1">無狀態</span>
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="mt-2 bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 shadow-inner">
+                                                                    <div className="flex items-center justify-between mb-1.5">
+                                                                        <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                            <Briefcase size={10} /> 背包 (Bag)
+                                                                        </div>
+                                                                        <span className="text-[9px] text-slate-600">{student.inventory.length}/5</span>
+                                                                    </div>
+                                                                    <div className="flex gap-1.5">
+                                                                        {student.inventory.slice(0, 5).map((item, i) => (
+                                                                            <div key={`inv-${i}`} className={`w-7 h-7 rounded bg-slate-800 border ${RARITY_STYLES[item.rarity].border} flex items-center justify-center text-sm shadow-sm relative group/icon cursor-help`}>
+                                                                                    {renderItemIcon(item.iconType, "w-4 h-4")}
+                                                                                {/* Enhanced Item Tooltip */}
+                                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/icon:opacity-100 pointer-events-none z-50 border border-slate-600 shadow-xl">
+                                                                                    <div className={`font-bold mb-1 ${RARITY_STYLES[item.rarity].text}`}>{item.name}</div>
+                                                                                    <div className="text-[10px] text-slate-300 leading-tight">{item.desc}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        ))}
+                                                                        {[...Array(Math.max(0, 5 - student.inventory.length))].map((_, i) => (
+                                                                            <div key={`empty-${i}`} className="w-7 h-7 rounded bg-slate-800/30 border border-slate-700/50 flex items-center justify-center">
+                                                                                <div className="w-1 h-1 rounded-full bg-slate-800"></div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-2 grid grid-cols-2 gap-2 relative">
+                                                                {QUESTS.map(quest => {
+                                                                    const isBonus = job.bonus === quest.type;
+                                                                    return <button key={quest.id} onClick={(e) => { e.stopPropagation(); handleCompleteQuest(student.id, quest) }} disabled={isDead} className={`flex items-center gap-2 text-[10px] p-1.5 rounded transition-colors text-left overflow-hidden ${isDead ? 'opacity-50' : (isBonus ? 'bg-indigo-900/40 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-600 hover:text-white' : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600')}`}><span className="shrink-0">{quest.icon}</span><span className="truncate flex-1">{quest.title}</span>{isBonus && !isDead && <span className="text-[8px] text-yellow-400">UP</span>}</button>;
+                                                                })}
+                                                            </div>
+
+                                                            {!isDead && (
+                                                                <button
+                                                                    onClick={(e) => promptDeleteStudent(student.id, e)}
+                                                                    className="absolute top-2 right-2 p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                                                                    title="移除英雄"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
                                                             )}
                                                         </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
 
-                                                        <div className="mt-2 bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 shadow-inner">
-                                                            <div className="flex items-center justify-between mb-1.5">
-                                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                                                    <Briefcase size={10} /> 背包 (Bag)
-                                                                </div>
-                                                                <span className="text-[9px] text-slate-600">{student.inventory.length}/5</span>
-                                                            </div>
-                                                            <div className="flex gap-1.5">
-                                                                {student.inventory.slice(0, 5).map((item, i) => (
-                                                                    <div key={`inv-${i}`} className={`w-7 h-7 rounded bg-slate-800 border ${RARITY_STYLES[item.rarity].border} flex items-center justify-center text-sm shadow-sm relative group/icon cursor-help`}>
-                                                                            {renderItemIcon(item.iconType, "w-4 h-4")}
-                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover/icon:opacity-100 pointer-events-none z-30 border border-slate-600">
-                                                                            {item.name}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                                {[...Array(Math.max(0, 5 - student.inventory.length))].map((_, i) => (
-                                                                    <div key={`empty-${i}`} className="w-7 h-7 rounded bg-slate-800/30 border border-slate-700/50 flex items-center justify-center">
-                                                                        <div className="w-1 h-1 rounded-full bg-slate-800"></div>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mt-2 grid grid-cols-2 gap-2 relative">
-                                                        {QUESTS.map(quest => {
-                                                            const isBonus = job.bonus === quest.type;
-                                                            return <button key={quest.id} onClick={(e) => { e.stopPropagation(); handleCompleteQuest(student.id, quest) }} disabled={isDead} className={`flex items-center gap-2 text-[10px] p-1.5 rounded transition-colors text-left overflow-hidden ${isDead ? 'opacity-50' : (isBonus ? 'bg-indigo-900/40 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-600 hover:text-white' : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600')}`}><span className="shrink-0">{quest.icon}</span><span className="truncate flex-1">{quest.title}</span>{isBonus && !isDead && <span className="text-[8px] text-yellow-400">UP</span>}</button>;
-                                                        })}
-                                                    </div>
-
-                                                    {!isDead && (
-                                                        <button
-                                                            onClick={(e) => promptDeleteStudent(student.id, e)}
-                                                            className="absolute top-2 right-2 p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"
-                                                            title="移除英雄"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    )}
+                                        <div className="md:col-span-1">
+                                            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-lg h-full max-h-[500px] flex flex-col">
+                                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14} /> 冒險日誌</h3>
+                                                <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-slate-600">
+                                                    {activeCourse.logs.map((log, idx) => (
+                                                        <div key={idx} className={`text-xs border-l-2 pl-2 py-0.5 ${log.includes('警示') ? 'text-red-300 border-red-500' : (log.includes('掉落') ? 'text-purple-300 border-purple-500' : (log.includes('購買') ? 'text-yellow-300 border-yellow-500' : 'text-slate-300 border-indigo-500'))}`}>{log}</div>
+                                                    ))}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-1">
-                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-lg h-full max-h-[500px] flex flex-col">
-                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14} /> 冒險日誌</h3>
-                                        <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-slate-600">
-                                            {activeCourse.logs.map((log, idx) => (
-                                                <div key={idx} className={`text-xs border-l-2 pl-2 py-0.5 ${log.includes('警示') ? 'text-red-300 border-red-500' : (log.includes('掉落') ? 'text-purple-300 border-purple-500' : (log.includes('購買') ? 'text-yellow-300 border-yellow-500' : 'text-slate-300 border-indigo-500'))}`}>{log}</div>
-                                            ))}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-500 animate-fadeIn">
+                                <div className="text-6xl mb-4 grayscale opacity-50">🗺️</div>
+                                <div className="text-xl font-bold text-slate-400 mb-2">目前沒有副本</div>
+                                <div className="text-sm mb-6">請在左側建立新的冒險，開始英雄的旅程！</div>
+                                <button onClick={() => { setIsSidebarOpen(true); document.querySelector('input[placeholder="新副本..."]')?.focus(); }} className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full font-bold shadow-lg transition-all hover:scale-105 flex items-center gap-2">
+                                    <PlusCircle size={18} /> 建立新副本
+                                </button>
                             </div>
-                        </div>
+                        )}
                     </main>
 
                     {/* --- Modals --- */}
@@ -1166,24 +1231,45 @@
                                                             <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'head') ? RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'head').rarity].border : 'border-white/20 border-dashed'}`}>
                                                                 {getEquippedItem(targetStudent.inventory, 'head') ? renderItemIcon(getEquippedItem(targetStudent.inventory, 'head').iconType, "text-2xl") : <Crown size={16} className="text-white/30" />}
                                                             </div>
-                                                            {getEquippedItem(targetStudent.inventory, 'head') && <div className="absolute bottom-full mb-1 bg-black px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">{getEquippedItem(targetStudent.inventory, 'head').name}</div>}
+                                                            {getEquippedItem(targetStudent.inventory, 'head') && (
+                                                                <div className="absolute bottom-full mb-2 w-40 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600 z-50 pointer-events-none shadow-xl text-center">
+                                                                    <div className={`font-bold mb-1 ${RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'head').rarity].text}`}>{getEquippedItem(targetStudent.inventory, 'head').name}</div>
+                                                                    <div className="text-[10px] text-slate-300">{getEquippedItem(targetStudent.inventory, 'head').desc}</div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="absolute top-1/2 -left-12 -translate-y-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:-translate-x-[-10px]">
                                                             <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'weapon') ? RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'weapon').rarity].border : 'border-white/20 border-dashed'}`}>
                                                                 {getEquippedItem(targetStudent.inventory, 'weapon') ? renderItemIcon(getEquippedItem(targetStudent.inventory, 'weapon').iconType, "text-2xl") : <Swords size={16} className="text-white/30" />}
                                                             </div>
-                                                            {getEquippedItem(targetStudent.inventory, 'weapon') && <div className="absolute right-full mr-2 bg-black px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">{getEquippedItem(targetStudent.inventory, 'weapon').name}</div>}
+                                                            {getEquippedItem(targetStudent.inventory, 'weapon') && (
+                                                                <div className="absolute right-full mr-2 w-40 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600 z-50 pointer-events-none shadow-xl text-center">
+                                                                    <div className={`font-bold mb-1 ${RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'weapon').rarity].text}`}>{getEquippedItem(targetStudent.inventory, 'weapon').name}</div>
+                                                                    <div className="text-[10px] text-slate-300">{getEquippedItem(targetStudent.inventory, 'weapon').desc}</div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:translate-x-[10px]">
                                                             <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand') ? RARITY_STYLES[(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).rarity].border : 'border-white/20 border-dashed'}`}>
                                                                 {(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')) ? renderItemIcon((getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).iconType, "text-2xl") : <Shield size={16} className="text-white/30" />}
                                                             </div>
+                                                            {(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')) && (
+                                                                <div className="absolute left-full ml-2 w-40 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600 z-50 pointer-events-none shadow-xl text-center">
+                                                                    <div className={`font-bold mb-1 ${RARITY_STYLES[(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).rarity].text}`}>{(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).name}</div>
+                                                                    <div className="text-[10px] text-slate-300">{(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).desc}</div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:translate-y-[10px]">
                                                             <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'feet') ? RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'feet').rarity].border : 'border-white/20 border-dashed'}`}>
                                                                 {getEquippedItem(targetStudent.inventory, 'feet') ? renderItemIcon(getEquippedItem(targetStudent.inventory, 'feet').iconType, "text-2xl") : <Footprints size={16} className="text-white/30" />}
                                                             </div>
-                                                            {getEquippedItem(targetStudent.inventory, 'feet') && <div className="absolute top-full mt-1 bg-black px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">{getEquippedItem(targetStudent.inventory, 'feet').name}</div>}
+                                                            {getEquippedItem(targetStudent.inventory, 'feet') && (
+                                                                <div className="absolute top-full mt-2 w-40 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600 z-50 pointer-events-none shadow-xl text-center">
+                                                                    <div className={`font-bold mb-1 ${RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'feet').rarity].text}`}>{getEquippedItem(targetStudent.inventory, 'feet').name}</div>
+                                                                    <div className="text-[10px] text-slate-300">{getEquippedItem(targetStudent.inventory, 'feet').desc}</div>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1214,8 +1300,8 @@
                                                 <div className="text-2xl font-black text-blue-400">{targetStudent.inventory.length}</div>
                                             </div>
                                         </div>
-                                        <div className="mb-4 bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
-                                            <div className="p-3 bg-slate-800/50 border-b border-slate-700 font-bold text-slate-300 flex items-center gap-2">
+                                        <div className="mb-4 bg-slate-800/30 rounded-xl border border-slate-700 relative">
+                                            <div className="p-3 bg-slate-800/50 border-b border-slate-700 font-bold text-slate-300 flex items-center gap-2 rounded-t-xl">
                                                 <Zap size={16} className="text-yellow-400" /> 生效中的增益 (Active Buffs)
                                             </div>
                                             {targetStudent.buffs.length === 0 ? (
@@ -1225,13 +1311,19 @@
                                                     {targetStudent.buffs.map((buff, idx) => {
                                                         const d = getBuffInfo(buff.id);
                                                         return (
-                                                            <div key={idx} className="flex items-center gap-3 bg-slate-800 p-2 rounded border border-slate-600">
+                                                            <div key={idx} className="relative group/buff flex items-center gap-3 bg-slate-800 p-2 rounded border border-slate-600 cursor-help transition-colors hover:bg-slate-700">
                                                                 <div className="w-8 h-8 flex items-center justify-center bg-slate-900 rounded border border-slate-700">
                                                                     {renderItemIcon(d.iconType, `w-5 h-5 ${d.color}`)}
                                                                 </div>
                                                                 <div>
                                                                     <div className="font-bold text-white text-xs">{d.name}</div>
                                                                     <div className="text-[10px] text-slate-400">剩餘: {buff.charges} 次</div>
+                                                                </div>
+                                                                
+                                                                {/* Buff Tooltip inside Modal */}
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-900 text-white text-xs rounded opacity-0 group-hover/buff:opacity-100 pointer-events-none z-50 border border-slate-600 shadow-xl transition-opacity">
+                                                                    <div className={`font-bold mb-1 ${d.color}`}>{d.name}</div>
+                                                                    <div className="text-[10px] text-slate-300 leading-tight">{d.desc}</div>
                                                                 </div>
                                                             </div>
                                                         );
