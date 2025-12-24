@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hero Classroom 英雄教室</title>
+    
+    <!-- 1. 引入 React 和 ReactDOM (UMD Global) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- 2. 引入 Babel 解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 3. 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 4. 設定 Tailwind -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fadeIn': 'fadeIn 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.95)' },
+                            '100%': { opacity: '1', transform: 'scale(1)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- 5. Import Map: 解決 Failed to resolve module specifier 'react' 錯誤 -->
+    <script type="importmap">
+        {
+            "imports": {
+                "react": "data:text/javascript;charset=utf-8,export const {useState,useEffect,useRef,createElement,forwardRef} = window.React; export default window.React;",
+                "react-dom": "data:text/javascript;charset=utf-8,export default window.ReactDOM;"
+            }
+        }
+    </script>
+
+    <!-- 6. 載入 Lucide React 圖示庫 -->
+    <script type="module">
+        import * as Lucide from "https://esm.sh/lucide-react@0.469.0?external=react";
+        window.LucideIcons = Lucide;
+        window.dispatchEvent(new Event('lucide-loaded'));
+    </script>
+
+    <style>
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: #1e293b; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+        .preserve-3d { transform-style: preserve-3d; }
+        .translate-z-10 { transform: translateZ(10px); }
+        .translate-z-20 { transform: translateZ(20px); }
+        .perspective-1000 { perspective: 1000px; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function AppContainer() {
+            const [iconsLoaded, setIconsLoaded] = useState(false);
+
+            useEffect(() => {
+                if (window.LucideIcons) {
+                    setIconsLoaded(true);
+                } else {
+                    const handler = () => setIconsLoaded(true);
+                    window.addEventListener('lucide-loaded', handler);
+                    return () => window.removeEventListener('lucide-loaded', handler);
+                }
+            }, []);
+
+            if (!iconsLoaded) {
+                return (
+                    <div className="flex h-screen items-center justify-center bg-slate-900 text-indigo-400">
+                        <div className="text-center">
+                            <div className="text-4xl animate-spin mb-4">⚔️</div>
+                            <div className="font-bold">正在召喚英雄...</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return <App />;
+        }
+
+        function App() {
+            const { 
+                Shield, Zap, BookOpen, Crown, Users, Award, Trash2, PlusCircle, 
+                Map, Layout, Calculator, Languages, Edit, Check, X, Swords, 
+                Sparkles, Scroll, Heart, RefreshCcw, Skull, Activity, Bandage, 
+                Gift, Trophy, FileText, FlaskConical, Egg, Briefcase, 
+                Coins, ShoppingBag, Gem, Lock, Unlock, Dices, Search, Star, Shirt, Footprints, Monitor, AlertTriangle,
+                HelpCircle, Backpack, Hammer, Wand2, Download, Upload, Save
+            } = window.LucideIcons;
+
+            // --- Components ---
+
+            const Modal = ({ type, message, onConfirm, onCancel }) => {
+                if (!type) return null;
+                return (
+                    <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 animate-fadeIn">
+                        <div className="bg-slate-900 p-6 rounded-2xl border border-slate-600 w-full max-w-sm shadow-2xl text-center">
+                            <h3 className="text-xl font-bold text-white mb-4">{type === 'alert' ? '提示' : '確認'}</h3>
+                            <p className="text-slate-300 mb-6">{message}</p>
+                            <div className="flex gap-3 justify-center">
+                                {type === 'confirm' && (
+                                    <button onClick={onCancel} className="flex-1 py-2 rounded-lg bg-slate-700 text-slate-300 hover:bg-slate-600 font-bold">取消</button>
+                                )}
+                                <button onClick={onConfirm} className="flex-1 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 font-bold">確認</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // Pixel Art Components (SVG)
+            const PixelSword = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <path d="M22 4 L28 10 L26 12 L24 10 L22 12 L20 10 L22 8 L20 6 Z" fill="#e2e8f0" />
+                    <path d="M12 14 L22 4 L26 8 L16 18 Z" fill="#cbd5e1" />
+                    <path d="M14 16 L12 14 L16 10 L18 12 Z" fill="#94a3b8" />
+                    <rect x="8" y="18" width="8" height="2" transform="rotate(-45 12 19)" fill="#eab308" />
+                    <rect x="6" y="24" width="4" height="4" transform="rotate(-45 8 26)" fill="#78350f" />
+                    <circle cx="5" cy="27" r="1.5" fill="#eab308" />
+                </svg>
+            );
+
+            const PixelShield = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <path d="M6 4 L26 4 L26 12 C26 22 16 28 16 28 C16 28 6 22 6 12 Z" fill="#3b82f6" />
+                    <path d="M8 6 L24 6 L24 12 C24 20 16 26 16 26 C16 26 8 20 8 12 Z" fill="#60a5fa" />
+                    <path d="M16 6 L16 26" stroke="#1d4ed8" strokeWidth="2" />
+                    <path d="M8 12 L24 12" stroke="#1d4ed8" strokeWidth="2" />
+                    <rect x="6" y="4" width="20" height="2" fill="#1e3a8a" />
+                </svg>
+            );
+
+            const PixelPotion = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="14" y="4" width="4" height="6" fill="#9ca3af" />
+                    <rect x="13" y="3" width="6" height="2" fill="#4b5563" />
+                    <circle cx="16" cy="18" r="10" fill="#ef4444" />
+                    <circle cx="16" cy="18" r="8" fill="#f87171" />
+                    <circle cx="19" cy="14" r="2" fill="white" opacity="0.6" />
+                    <rect x="15" y="6" width="2" height="4" fill="#fecaca" opacity="0.5" />
+                </svg>
+            );
+
+            const PixelScroll = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="6" y="6" width="20" height="20" fill="#fef3c7" />
+                    <rect x="4" y="4" width="24" height="4" fill="#d97706" />
+                    <rect x="4" y="24" width="24" height="4" fill="#d97706" />
+                    <rect x="8" y="10" width="16" height="2" fill="#92400e" />
+                    <rect x="8" y="14" width="12" height="2" fill="#92400e" />
+                    <rect x="8" y="18" width="14" height="2" fill="#92400e" />
+                    <circle cx="16" cy="16" r="3" fill="#ef4444" opacity="0.3" />
+                </svg>
+            );
+
+            const PixelHelm = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <path d="M6 14 L6 24 L10 28 L22 28 L26 24 L26 14 L16 4 Z" fill="#94a3b8" />
+                    <rect x="14" y="4" width="4" height="24" fill="#64748b" />
+                    <rect x="8" y="16" width="16" height="4" fill="#1e293b" />
+                    <rect x="15" y="2" width="2" height="6" fill="#eab308" />
+                    <path d="M16 2 L24 6 L16 10 Z" fill="#ef4444" />
+                </svg>
+            );
+
+            const PixelBoots = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <path d="M8 12 L14 12 L14 26 L22 26 L22 30 L8 30 Z" fill="#78350f" />
+                    <path d="M18 10 L24 10 L24 24 L30 24 L30 28 L18 28 Z" fill="#92400e" transform="translate(2, -2)" />
+                    <rect x="8" y="12" width="6" height="4" fill="#b45309" />
+                </svg>
+            );
+
+            const PixelRing = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <circle cx="16" cy="16" r="10" fill="none" stroke="#eab308" strokeWidth="4" />
+                    <rect x="13" y="4" width="6" height="6" fill="#3b82f6" />
+                    <rect x="14" y="5" width="4" height="4" fill="#60a5fa" />
+                </svg>
+            );
+
+            const PixelCoin = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <circle cx="16" cy="16" r="12" fill="#eab308" />
+                    <circle cx="16" cy="16" r="9" fill="#facc15" />
+                    <path d="M14 10 L18 10 L18 22 L14 22 Z" fill="#a16207" />
+                    <rect x="12" y="14" width="8" height="4" fill="#a16207" />
+                </svg>
+            );
+
+            const PixelBook = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="6" y="6" width="20" height="24" fill="#7f1d1d" />
+                    <rect x="8" y="4" width="18" height="24" fill="#fefce8" />
+                    <rect x="22" y="6" width="4" height="22" fill="#7f1d1d" />
+                    <rect x="12" y="10" width="8" height="8" fill="#a855f7" opacity="0.5" />
+                </svg>
+            );
+
+            const PixelDagger = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <path d="M24 6 L28 10 L18 20 L14 16 Z" fill="#94a3b8" />
+                    <rect x="12" y="18" width="6" height="2" transform="rotate(45 15 19)" fill="#475569" />
+                    <rect x="8" y="22" width="4" height="4" fill="#78350f" />
+                </svg>
+            );
+
+            const PixelStaff = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="14" y="10" width="4" height="20" fill="#78350f" />
+                    <circle cx="16" cy="6" r="6" fill="#22c55e" />
+                    <circle cx="16" cy="6" r="4" fill="#4ade80" />
+                    <circle cx="18" cy="4" r="2" fill="#ffffff" />
+                </svg>
+            );
+
+            const PixelBackpack = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="6" y="8" width="20" height="20" rx="4" fill="#a16207" />
+                    <rect x="6" y="8" width="20" height="8" fill="#ca8a04" />
+                    <rect x="14" y="14" width="4" height="6" fill="#78350f" />
+                    <rect x="8" y="20" width="6" height="6" fill="#78350f" opacity="0.5" />
+                    <rect x="18" y="20" width="6" height="6" fill="#78350f" opacity="0.5" />
+                </svg>
+            );
+
+            const PixelEgg = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <ellipse cx="16" cy="16" rx="10" ry="14" fill="#fbbf24" />
+                    <ellipse cx="16" cy="16" rx="6" ry="10" fill="#fcd34d" opacity="0.5" />
+                    <path d="M12 10 L20 10 L16 16 Z" fill="#ffffff" opacity="0.8" />
+                </svg>
+            );
+
+            const PixelCrown = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <path d="M4 24 L28 24 L28 16 L22 20 L16 8 L10 20 L4 16 Z" fill="#eab308" />
+                    <rect x="4" y="24" width="24" height="4" fill="#ca8a04" />
+                    <circle cx="16" cy="26" r="2" fill="#ef4444" />
+                    <circle cx="16" cy="8" r="2" fill="#ffffff" />
+                </svg>
+            );
+
+            const PixelHammer = ({ className }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="14" y="10" width="4" height="20" fill="#57534e" />
+                    <rect x="6" y="4" width="20" height="10" fill="#475569" />
+                    <rect x="8" y="6" width="16" height="6" fill="#94a3b8" />
+                </svg>
+            );
+
+            const ITEM_ICONS = {
+                sword: PixelSword, shield: PixelShield, head: PixelHelm, ring: PixelRing, feet: PixelBoots,
+                potion: PixelPotion, scroll: PixelScroll, book: PixelBook, coin: PixelCoin, backpack: PixelBackpack,
+                dagger: PixelDagger, wand: PixelStaff, hammer: PixelHammer, egg: PixelEgg, crown: PixelCrown,
+                default: HelpCircle
+            };
+
+            const renderItemIcon = (iconKey, className = "") => {
+                const IconComponent = ITEM_ICONS[iconKey] || ITEM_ICONS.default;
+                return <IconComponent className={className} />;
+            };
+
+            const WarriorAvatar = ({ className, isAnimated = true }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="10" y="28" width="12" height="2" fill="#000" opacity="0.3" />
+                    <g className={isAnimated ? "animate-pulse" : ""}>
+                        <rect x="8" y="14" width="4" height="12" fill="#991b1b" />
+                        <rect x="20" y="14" width="4" height="12" fill="#991b1b" />
+                        <rect x="10" y="26" width="12" height="2" fill="#7f1d1d" />
+                    </g>
+                    <g className={isAnimated ? "animate-bounce" : ""}>
+                        <rect x="25" y="4" width="2" height="16" fill="#e2e8f0" />
+                        <rect x="25" y="4" width="1" height="16" fill="#f8fafc" />
+                        <rect x="23" y="20" width="6" height="2" fill="#f59e0b" />
+                        <rect x="25" y="22" width="2" height="4" fill="#78350f" />
+                        <rect x="25" y="26" width="2" height="1" fill="#f59e0b" />
+                    </g>
+                    <g className={isAnimated ? "animate-bounce" : ""}>
+                        <rect x="11" y="22" width="3" height="6" fill="#475569" />
+                        <rect x="18" y="22" width="3" height="6" fill="#475569" />
+                        <rect x="10" y="26" width="4" height="2" fill="#94a3b8" />
+                        <rect x="18" y="26" width="4" height="2" fill="#94a3b8" />
+                        <rect x="10" y="14" width="12" height="9" fill="#64748b" />
+                        <rect x="11" y="15" width="10" height="7" fill="#94a3b8" />
+                        <rect x="12" y="16" width="8" height="2" fill="#cbd5e1" />
+                        <rect x="14" y="18" width="4" height="3" fill="#dc2626" />
+                        <rect x="9" y="15" width="3" height="6" fill="#94a3b8" />
+                        <rect x="20" y="15" width="3" height="6" fill="#94a3b8" />
+                        <rect x="9" y="4" width="14" height="11" fill="#475569" />
+                        <rect x="10" y="3" width="12" height="10" fill="#64748b" />
+                        <rect x="11" y="3" width="10" height="1" fill="#cbd5e1" />
+                        <rect x="11" y="6" width="10" height="7" fill="#94a3b8" />
+                        <rect x="12" y="8" width="2" height="2" fill="#0f172a" />
+                        <rect x="18" y="8" width="2" height="2" fill="#0f172a" />
+                        <rect x="14" y="9" width="4" height="4" fill="#475569" />
+                        <rect x="8" y="5" width="1" height="4" fill="#cbd5e1" />
+                        <rect x="23" y="5" width="1" height="4" fill="#cbd5e1" />
+                        <rect x="14" y="0" width="4" height="3" fill="#dc2626" />
+                        <rect x="15" y="-1" width="2" height="1" fill="#ef4444" />
+                    </g>
+                </svg>
+            );
+
+            const MageAvatar = ({ className, isAnimated = true }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="10" y="28" width="12" height="2" fill="#000" opacity="0.3" />
+                    <g className={isAnimated ? "animate-pulse" : ""}>
+                        <rect x="24" y="8" width="2" height="20" fill="#a16207" />
+                        <rect x="22" y="4" width="6" height="6" fill="#4338ca" />
+                        <rect x="23" y="5" width="4" height="4" fill="#818cf8" className={isAnimated ? "animate-pulse" : ""} />
+                    </g>
+                    <g className={isAnimated ? "animate-bounce" : ""}>
+                        <rect x="9" y="22" width="14" height="6" fill="#1e1b4b" />
+                        <rect x="10" y="14" width="12" height="10" fill="#312e81" />
+                        <rect x="14" y="14" width="4" height="14" fill="#4338ca" />
+                        <rect x="10" y="7" width="12" height="8" fill="#fecaca" />
+                        <rect x="11" y="9" width="2" height="2" fill="#1e1b4b" />
+                        <rect x="18" y="9" width="2" height="2" fill="#1e1b4b" />
+                        <rect x="6" y="5" width="20" height="2" fill="#1e1b4b" />
+                        <rect x="8" y="3" width="16" height="2" fill="#312e81" />
+                        <rect x="10" y="1" width="12" height="2" fill="#4338ca" />
+                        <rect x="14" y="-2" width="4" height="3" fill="#4338ca" />
+                        <rect x="11" y="12" width="10" height="3" fill="#e2e8f0" />
+                        <rect x="13" y="15" width="6" height="2" fill="#e2e8f0" />
+                    </g>
+                </svg>
+            );
+
+            const RogueAvatar = ({ className, isAnimated = true }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="10" y="28" width="12" height="2" fill="#000" opacity="0.3" />
+                    <g className={isAnimated ? "animate-pulse" : ""}>
+                        <rect x="6" y="18" width="2" height="6" fill="#94a3b8" />
+                        <rect x="24" y="18" width="2" height="6" fill="#94a3b8" />
+                    </g>
+                    <g className={isAnimated ? "animate-bounce" : ""}>
+                        <rect x="11" y="22" width="3" height="6" fill="#1e293b" />
+                        <rect x="18" y="22" width="3" height="6" fill="#1e293b" />
+                        <rect x="10" y="14" width="12" height="9" fill="#3f1d08" />
+                        <rect x="12" y="15" width="8" height="7" fill="#78350f" />
+                        <rect x="9" y="13" width="14" height="3" fill="#dc2626" />
+                        <rect x="22" y="14" width="4" height="2" fill="#dc2626" />
+                        <rect x="10" y="5" width="12" height="9" fill="#1e293b" />
+                        <rect x="11" y="7" width="10" height="5" fill="#0f172a" />
+                        <rect x="12" y="8" width="2" height="2" fill="#fbbf24" className={isAnimated ? "animate-pulse" : ""} />
+                        <rect x="18" y="8" width="2" height="2" fill="#fbbf24" className={isAnimated ? "animate-pulse" : ""} />
+                        <rect x="10" y="4" width="12" height="2" fill="#334155" />
+                    </g>
+                </svg>
+            );
+
+            const ClericAvatar = ({ className, isAnimated = true }) => (
+                <svg viewBox="0 0 32 32" className={className} xmlns="http://www.w3.org/2000/svg" shapeRendering="crispEdges">
+                    <rect x="10" y="28" width="12" height="2" fill="#000" opacity="0.3" />
+                    <g className={isAnimated ? "animate-pulse" : ""}>
+                        <rect x="10" y="1" width="12" height="1" fill="#fcd34d" />
+                        <rect x="9" y="2" width="1" height="1" fill="#fcd34d" />
+                        <rect x="22" y="2" width="1" height="1" fill="#fcd34d" />
+                    </g>
+                    <g className={isAnimated ? "animate-bounce" : ""}>
+                        <rect x="9" y="22" width="14" height="6" fill="#f1f5f9" />
+                        <rect x="10" y="14" width="12" height="10" fill="#e2e8f0" />
+                        <rect x="14" y="14" width="4" height="14" fill="#34d399" />
+                        <rect x="15" y="18" width="2" height="6" fill="#fcd34d" />
+                        <rect x="10" y="6" width="12" height="9" fill="#fecaca" />
+                        <rect x="9" y="6" width="14" height="8" fill="#f1f5f9" />
+                        <rect x="11" y="8" width="10" height="6" fill="#fecaca" />
+                        <rect x="12" y="9" width="2" height="2" fill="#064e3b" />
+                        <rect x="18" y="9" width="2" height="2" fill="#064e3b" />
+                        <rect x="10" y="7" width="12" height="1" fill="#fcd34d" />
+                    </g>
+                </svg>
+            );
+
+            const MAX_HP = 10;
+
+            const JOB_DEFINITIONS = [
+                { id: 'warrior', name: '戰士', icon: <Swords size={24} />, desc: '堅毅的執行者，作業總是準時完成。', bonus: 'homework', bonusText: '繳交作業 +50% XP/CP', themeColor: 'from-slate-700 to-slate-900', lightColor: 'text-slate-400', AvatarComponent: WarriorAvatar },
+                { id: 'mage', name: '法師', icon: <Sparkles size={24} />, desc: '智慧的傳遞者，樂於指導同學。', bonus: 'support', bonusText: '幫助同學 +50% XP/CP', themeColor: 'from-indigo-900 to-slate-900', lightColor: 'text-indigo-400', AvatarComponent: MageAvatar },
+                { id: 'rogue', name: '盜賊', icon: <Zap size={24} />, desc: '反應靈敏，課堂問答最迅速。', bonus: 'participation', bonusText: '課堂回答 +50% XP/CP', themeColor: 'from-yellow-900 to-slate-900', lightColor: 'text-yellow-400', AvatarComponent: RogueAvatar },
+                { id: 'cleric', name: '牧師', icon: <Heart size={24} />, desc: '團隊的守護者，確保大家通過考試。', bonus: 'exam', bonusText: '考試達標 +50% XP/CP', themeColor: 'from-emerald-900 to-slate-900', lightColor: 'text-emerald-400', AvatarComponent: ClericAvatar }
+            ];
+
+            const QUESTS = [
+                { id: 1, title: '準時繳交作業', xp: 20, cp: 10, gp: 50, type: 'homework', icon: <BookOpen size={16} /> },
+                { id: 2, title: '課堂回答正確', xp: 10, cp: 5, gp: 20, type: 'participation', icon: <Zap size={16} /> },
+                { id: 3, title: '平時測驗達標', xp: 40, cp: 20, gp: 80, type: 'exam', icon: <FileText size={16} /> },
+                { id: 5, title: '定期評量 (大考)', xp: 100, cp: 60, gp: 300, type: 'exam', icon: <Crown size={16} /> },
+                { id: 4, title: '幫助同學解題', xp: 15, cp: 20, gp: 40, type: 'support', icon: <Shield size={16} /> },
+            ];
+
+            const BOSS_DEFINITIONS = [
+                { id: 'slime', name: '史萊姆王', hp: 300, avatar: '💧', desc: '初級試煉，適合新手冒險者隊伍。', difficulty: 'EASY' },
+                { id: 'goblin', name: '哥布林戰將', hp: 600, avatar: '👹', desc: '中級挑戰，需要團隊有一定的默契。', difficulty: 'NORMAL' },
+                { id: 'skeleton_king', name: '骷髏王', hp: 900, avatar: '💀', desc: '來自冥界的不死君王，考驗隊伍的持久力。', difficulty: 'HARD' },
+                { id: 'dragon', name: '深淵魔龍', hp: 1200, avatar: '🐉', desc: '終極夢魘，唯有傳奇英雄班級能擊敗！', difficulty: 'HARD' },
+                { id: 'gargoyle', name: '石像鬼守衛', hp: 1500, avatar: '🗿', desc: '擁有極高防禦力的空中單位，需要強大火力。', difficulty: 'EXPERT' },
+                { id: 'dark_wizard', name: '黑暗大法師', hp: 1800, avatar: '🧙‍♂️', desc: '擅長群體魔法，考驗團隊的智慧與反應。', difficulty: 'EXPERT' },
+                { id: 'kraken', name: '深海巨怪', hp: 2200, avatar: '🐙', desc: '來自深淵的恐懼，血量深不可測。', difficulty: 'MASTER' },
+                { id: 'mecha_titan', name: '機械巨神', hp: 2500, avatar: '🤖', desc: '科技與魔法的結晶，擁有毀滅性的力量。', difficulty: 'MASTER' },
+                { id: 'demon', name: '期末大魔王', hp: 3000, avatar: '👿', desc: '學期的最終考驗，戰勝它來獲得寒暑假！', difficulty: 'EPIC' },
+                { id: 'void_lord', name: '虛空領主', hp: 5000, avatar: '🌌', desc: '超越維度的存在，只有真正的英雄能挑戰。', difficulty: 'GOD' },
+            ];
+
+            const BUFF_DEFINITIONS = [
+                { id: 'xp_scroll', name: '專注卷軸', iconType: 'scroll', desc: '接下來 3 次任務 XP +50%', charges: 3, type: 'xp', value: 1.5, color: 'text-blue-400' },
+                { id: 'cp_potion', name: '勇氣藥水', iconType: 'potion', desc: '接下來 3 次任務 CP +50%', charges: 3, type: 'cp', value: 1.5, color: 'text-red-400' },
+                { id: 'golden_egg', name: '幸運金蛋', iconType: 'egg', desc: '下 1 次任務獎勵全面 2 倍', charges: 1, type: 'all', value: 2.0, color: 'text-yellow-400' },
+            ];
+
+            const INITIAL_SHOP_ITEMS = [
+                { id: 'rusty_sword', name: '生鏽的鐵劍', rarity: 'COMMON', cost: 150, iconType: 'sword', type: 'buff', buffType: 'cp', value: 0.05, slot: 'weapon', desc: '雖然有點鈍，但總比空手好。CP +5%。', ownerId: null },
+                { id: 'leather_boots', name: '皮革靴', rarity: 'COMMON', cost: 150, iconType: 'feet', type: 'buff', buffType: 'gp', value: 0.05, slot: 'feet', desc: '輕便好走，讓你跑腿更有效率。GP +5%。', ownerId: null },
+                { id: 'wooden_staff', name: '學徒法杖', rarity: 'COMMON', cost: 150, iconType: 'wand', type: 'buff', buffType: 'xp', value: 0.05, slot: 'weapon', desc: '法師學徒的第一把法杖。XP +5%。', ownerId: null },
+                { id: 'canvas_backpack', name: '帆布背包', rarity: 'COMMON', cost: 200, iconType: 'backpack', type: 'buff', buffType: 'gp', value: 0.05, slot: 'offhand', desc: '可以多裝一點戰利品。GP +5%。', ownerId: null },
+                { id: 'simple_ring', name: '鐵製戒指', rarity: 'COMMON', cost: 100, iconType: 'ring', type: 'symbolic', slot: 'accessory', desc: '簡單的裝飾品，沒有特殊魔力。', ownerId: null },
+                { id: 'iron_helm', name: '騎士頭盔', rarity: 'RARE', cost: 500, iconType: 'head', type: 'buff', buffType: 'cp', value: 0.10, slot: 'head', desc: '保護頭部，增加戰鬥信心。CP +10%。', ownerId: null },
+                { id: 'scholar_hat', name: '學者帽', rarity: 'RARE', cost: 500, iconType: 'head', type: 'buff', buffType: 'xp', value: 0.10, slot: 'head', desc: '戴上它，感覺變聰明了。XP +10%。', ownerId: null },
+                { id: 'thief_dagger', name: '盜賊匕首', rarity: 'RARE', cost: 600, iconType: 'dagger', type: 'buff', buffType: 'cp', value: 0.12, slot: 'weapon', desc: '鋒利且隱密，適合突襲。CP +12%。', ownerId: null },
+                { id: 'cleric_symbol', name: '神聖護符', rarity: 'RARE', cost: 550, iconType: 'ring', type: 'buff', buffType: 'xp', value: 0.08, slot: 'accessory', desc: '受到神聖庇護，學習更專注。XP +8%。', ownerId: null },
+                { id: 'swift_boots', name: '疾風之靴', rarity: 'RARE', cost: 650, iconType: 'feet', type: 'buff', buffType: 'gp', value: 0.10, slot: 'feet', desc: '跑得像風一樣快！GP +10%。', ownerId: null },
+                { id: 'dragon_shield', name: '龍鱗盾', rarity: 'EPIC', cost: 1500, iconType: 'shield', type: 'buff', buffType: 'cp', value: 0.15, slot: 'offhand', desc: '用龍鱗打造的盾牌，堅不可摧。CP +15%。', ownerId: null },
+                { id: 'wizard_tome', name: '大法師魔導書', rarity: 'EPIC', cost: 1800, iconType: 'book', type: 'buff', buffType: 'xp', value: 0.15, slot: 'offhand', desc: '記載著失傳的古代魔法。XP +15%。', ownerId: null },
+                { id: 'lucky_coin', name: '幸運金幣', rarity: 'EPIC', cost: 2000, iconType: 'coin', type: 'buff', buffType: 'gp', value: 0.20, slot: 'accessory', desc: '被幸運女神吻過的硬幣。GP +20%。', ownerId: null },
+                { id: 'assassin_cloak', name: '暗影披風', rarity: 'EPIC', cost: 1600, iconType: 'head', type: 'buff', buffType: 'cp', value: 0.18, slot: 'head', desc: '融入陰影之中，敵人難以察覺。CP +18%。', ownerId: null },
+                { id: 'excalibur', name: '王者之劍', rarity: 'LEGENDARY', cost: 5000, iconType: 'sword', type: 'buff', buffType: 'cp', value: 0.25, slot: 'weapon', desc: '傳說中選定之王的佩劍，擁有無窮力量。CP +25%。', ownerId: null },
+                { id: 'crown_wisdom', name: '智慧皇冠', rarity: 'LEGENDARY', cost: 4500, iconType: 'crown', type: 'buff', buffType: 'xp', value: 0.25, slot: 'head', desc: '賦予佩戴者無上的智慧與洞察力。XP +25%。', ownerId: null },
+                { id: 'midas_gloves', name: '點金手套', rarity: 'LEGENDARY', cost: 4800, iconType: 'ring', type: 'buff', buffType: 'gp', value: 0.30, slot: 'offhand', desc: '觸碰之物皆成黃金。GP +30%。', ownerId: null },
+            ];
+
+            const RARITY_STYLES = {
+                COMMON: { border: 'border-slate-500', text: 'text-slate-400', bg: 'bg-slate-800', shadow: '' },
+                RARE: { border: 'border-blue-400', text: 'text-blue-400', bg: 'bg-blue-900/20', shadow: 'shadow-blue-500/20' },
+                EPIC: { border: 'border-purple-400', text: 'text-purple-400', bg: 'bg-purple-900/30', shadow: 'shadow-purple-500/40' },
+                LEGENDARY: { border: 'border-yellow-400', text: 'text-yellow-400', bg: 'bg-yellow-900/40', shadow: 'shadow-yellow-500/50 animate-pulse' },
+            };
+
+            const INITIAL_COURSES = [
+                {
+                    id: 'math-101',
+                    name: '數學迷宮',
+                    icon: 'Calculator',
+                    students: [
+                        { id: 1, name: '小明', job: 'warrior', lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 50, hp: 10, maxHp: 10, buffs: [], inventory: [] },
+                        { id: 2, name: '小華', job: 'mage', lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 50, hp: 10, maxHp: 10, buffs: [], inventory: [] },
+                    ],
+                    logs: [],
+                    bossId: 'slime',
+                    bossReward: '全班免作業一次',
+                    isBossDefeated: false,
+                    shopItems: JSON.parse(JSON.stringify(INITIAL_SHOP_ITEMS))
+                }
+            ];
+
+            // --- State Management ---
+            const [courses, setCourses] = useState(() => {
+                const saved = localStorage.getItem('hero-classroom-data');
+                return saved ? JSON.parse(saved) : INITIAL_COURSES;
+            });
+
+            const [activeCourseId, setActiveCourseId] = useState(() => {
+                return localStorage.getItem('hero-classroom-active-id') || (courses[0]?.id || null);
+            });
+
+            const [newCourseName, setNewCourseName] = useState('');
+            const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+            const fileInputRef = useRef(null);
+
+            // Admin States
+            const [adminPassword, setAdminPassword] = useState(() => localStorage.getItem('hero-admin-password') || null);
+            const [isAdminMode, setIsAdminMode] = useState(false);
+            const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+            const [passwordInput, setPasswordInput] = useState('');
+            const [passwordMode, setPasswordMode] = useState('VERIFY');
+            const [pendingAction, setPendingAction] = useState(null);
+
+            // Modals
+            const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+            const [recruitName, setRecruitName] = useState('');
+            const [recruitJobId, setRecruitJobId] = useState('warrior');
+            const [isJobChangeModalOpen, setIsJobChangeModalOpen] = useState(false);
+            const [targetStudent, setTargetStudent] = useState(null);
+            const [newJobId, setNewJobId] = useState('');
+            const [isBuffModalOpen, setIsBuffModalOpen] = useState(false);
+            const [selectedBuffId, setSelectedBuffId] = useState('xp_scroll');
+            const [isBossModalOpen, setIsBossModalOpen] = useState(false);
+            const [selectedBossId, setSelectedBossId] = useState('slime');
+            const [customReward, setCustomReward] = useState('');
+            const [isShopModalOpen, setIsShopModalOpen] = useState(false);
+            const [isInventoryViewerOpen, setIsInventoryViewerOpen] = useState(false);
+            const [deleteTargetId, setDeleteTargetId] = useState(null);
+            const [discardTarget, setDiscardTarget] = useState(null);
+            const [isChestOpen, setIsChestOpen] = useState(false);
+            const [showRewardModal, setShowRewardModal] = useState(false);
+            const [modalConfig, setModalConfig] = useState({ type: null, message: '', onConfirm: null });
+
+            // Effects
+            useEffect(() => {
+                localStorage.setItem('hero-classroom-data', JSON.stringify(courses));
+            }, [courses]);
+
+            useEffect(() => {
+                if (activeCourseId) localStorage.setItem('hero-classroom-active-id', activeCourseId);
+            }, [activeCourseId]);
+
+            // --- Handlers ---
+            const showAlert = (message) => {
+                setModalConfig({ type: 'alert', message, onConfirm: () => setModalConfig({ type: null, message: '', onConfirm: null }) });
+            };
+
+            const showConfirm = (message, onConfirm) => {
+                setModalConfig({ type: 'confirm', message, onConfirm: () => { onConfirm(); setModalConfig({ type: null, message: '', onConfirm: null }); } });
+            };
+
+            const handleExportData = () => {
+                const dataStr = JSON.stringify(courses, null, 2);
+                const blob = new Blob([dataStr], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `hero_classroom_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const handleImportClick = () => {
+                fileInputRef.current.click();
+            };
+
+            const handleImportFile = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (Array.isArray(importedData)) {
+                            showConfirm("確定要匯入此紀錄檔嗎？這將覆蓋當前所有資料！", () => {
+                                setCourses(importedData);
+                                showAlert("資料匯入成功！");
+                            });
+                        } else {
+                            showAlert("檔案格式錯誤！請確認是正確的備份檔。");
+                        }
+                    } catch (error) {
+                        showAlert("無法讀取檔案，內容可能已損壞。");
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = null;
+            };
+
+            const handleAdminCheck = (action) => {
+                if (isAdminMode) {
+                    action();
+                } else {
+                    setPendingAction(() => action);
+                    setPasswordInput('');
+                    if (!adminPassword) {
+                        setPasswordMode('SET');
+                    } else {
+                        setPasswordMode('VERIFY');
+                    }
+                    setIsPasswordModalOpen(true);
+                }
+            };
+
+            const handlePasswordSubmit = () => {
+                if (passwordMode === 'SET') {
+                    if (passwordInput.trim().length < 4) {
+                        showAlert('密碼至少需要4個字元');
+                        return;
+                    }
+                    localStorage.setItem('hero-admin-password', passwordInput);
+                    setAdminPassword(passwordInput);
+                    setIsAdminMode(true);
+                    setIsPasswordModalOpen(false);
+                    if (pendingAction) pendingAction();
+                } else {
+                    if (passwordInput === adminPassword) {
+                        setIsAdminMode(true);
+                        setIsPasswordModalOpen(false);
+                        if (pendingAction) pendingAction();
+                    } else {
+                        showAlert('密碼錯誤！');
+                    }
+                }
+                setPendingAction(null);
+            };
+
+            const toggleAdminLock = () => {
+                if (isAdminMode) {
+                    setIsAdminMode(false);
+                } else {
+                    handleAdminCheck(() => { });
+                }
+            };
+
+            const activeCourse = courses.find(c => c.id === activeCourseId) || courses[0];
+            const activeBoss = BOSS_DEFINITIONS.find(b => b.id === activeCourse.bossId) || BOSS_DEFINITIONS[0];
+            const totalCP = activeCourse?.students.reduce((acc, curr) => acc + curr.cp, 0) || 0;
+            const damagePercent = Math.min((totalCP / activeBoss.hp) * 100, 100);
+            const isDefeated = damagePercent >= 100;
+
+            const getJobInfo = (jobId) => JOB_DEFINITIONS.find(j => j.id === jobId) || JOB_DEFINITIONS[0];
+            const getBuffInfo = (buffId) => BUFF_DEFINITIONS.find(b => b.id === buffId) || BUFF_DEFINITIONS[0];
+            const getHighestRarity = (inventory) => {
+                if (!inventory || inventory.length === 0) return 'COMMON';
+                if (inventory.some(i => i.rarity === 'LEGENDARY')) return 'LEGENDARY';
+                if (inventory.some(i => i.rarity === 'EPIC')) return 'EPIC';
+                if (inventory.some(i => i.rarity === 'RARE')) return 'RARE';
+                return 'COMMON';
+            };
+            const getEquippedItem = (inventory, slotType) => {
+                if (!inventory) return null;
+                const items = inventory.filter(i => {
+                    if (i.slot === slotType) return true;
+                    if (!i.slot) {
+                        if (slotType === 'head' && i.id.includes('crown')) return true;
+                        if (slotType === 'weapon' && (i.id.includes('sword') || i.id.includes('wand'))) return true;
+                        if (slotType === 'offhand' && (i.id.includes('book') || i.id.includes('shield'))) return true;
+                        if (slotType === 'feet' && i.id.includes('boots')) return true;
+                        if (slotType === 'accessory' && i.id.includes('ring')) return true;
+                    }
+                    return false;
+                });
+                if (items.length === 0) return null;
+                return items[items.length - 1];
+            };
+
+            const calculateRewards = (student, quest) => {
+                const job = getJobInfo(student.job);
+                const isBonus = job.bonus === quest.type;
+                const jobMultiplier = isBonus ? 1.5 : 1;
+                const levelScale = 1 + (student.lv - 1) * 0.1;
+                let xpMultiplier = 1;
+                let cpMultiplier = 1;
+                let gpMultiplier = 1;
+                let equipXpBonus = 0;
+                let equipCpBonus = 0;
+                let equipGpBonus = 0;
+
+                if (student.buffs && student.buffs.length > 0) {
+                    student.buffs.forEach(buff => {
+                        const def = getBuffInfo(buff.id);
+                        if (def.type === 'xp' || def.type === 'all') xpMultiplier *= def.value;
+                        if (def.type === 'cp' || def.type === 'all') cpMultiplier *= def.value;
+                    });
+                }
+                if (student.inventory) {
+                    student.inventory.forEach(item => {
+                        if (item.type === 'buff') {
+                            if (item.buffType === 'xp') equipXpBonus += item.value;
+                            if (item.buffType === 'cp') equipCpBonus += item.value;
+                            if (item.buffType === 'gp') equipGpBonus += item.value;
+                        }
+                    });
+                }
+                const totalXPMultiplier = jobMultiplier * levelScale * (1 + equipXpBonus) * xpMultiplier;
+                const totalCPMultiplier = jobMultiplier * levelScale * (1 + equipCpBonus) * cpMultiplier;
+                const totalGPMultiplier = (1 + equipGpBonus) * 1;
+
+                return {
+                    finalXP: Math.floor(quest.xp * totalXPMultiplier),
+                    finalCP: Math.floor(quest.cp * totalCPMultiplier),
+                    finalGP: Math.floor(quest.gp * totalGPMultiplier),
+                    isBonus,
+                    levelScale,
+                    equipmentBonus: []
+                };
+            };
+
+            const handleCompleteQuest = (studentId, quest) => {
+                setCourses(prev => prev.map(course => {
+                    if (course.id !== activeCourseId) return course;
+                    const student = course.students.find(s => s.id === studentId);
+                    if (student.hp <= 0) { showAlert(`${student.name} 力竭中！`); return course; }
+                    let levelUpInfo = null;
+                    let dropsInfo = [];
+                    const updatedStudents = course.students.map(s => {
+                        if (s.id !== studentId) return s;
+                        if (s.hp <= 0) return s;
+                        const rewards = calculateRewards(s, quest);
+                        let dropGP = 0;
+                        let dropBuffs = [];
+                        if (Math.random() < 0.3) {
+                            const roll = Math.random();
+                            if (roll < 0.4) { dropBuffs.push({ id: 'xp_scroll', charges: 3 }); dropsInfo.push('📜 專注卷軸'); }
+                            else if (roll < 0.7) { dropBuffs.push({ id: 'cp_potion', charges: 3 }); dropsInfo.push('⚗️ 勇氣藥水'); }
+                            else if (roll < 0.9) { dropGP = 50; dropsInfo.push('💰 小錢袋(+50G)'); }
+                            else { dropBuffs.push({ id: 'golden_egg', charges: 1 }); dropsInfo.push('🥚 幸運金蛋'); }
+                        }
+                        let newXp = s.xp + rewards.finalXP;
+                        let newLv = s.lv;
+                        let newMaxXp = s.maxXp;
+                        if (newXp >= s.maxXp) { newXp -= s.maxXp; newLv += 1; newMaxXp = Math.floor(s.maxXp * 1.2); levelUpInfo = s.name; }
+                        let finalBuffs = [];
+                        if (s.buffs) {
+                            s.buffs.forEach(b => { if (b.charges > 1) finalBuffs.push({ ...b, charges: b.charges - 1 }); });
+                        }
+                        finalBuffs = [...finalBuffs, ...dropBuffs];
+                        return { ...s, lv: newLv, xp: newXp, maxXp: newMaxXp, cp: s.cp + rewards.finalCP, gp: s.gp + rewards.finalGP + dropGP, buffs: finalBuffs };
+                    });
+                    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const r = calculateRewards(student, quest);
+                    let log = `[${time}] ⚔️ ${student.name} 完成任務`;
+                    const tags = [`+${r.finalCP}CP`, `+${r.finalGP}GP`];
+                    if (r.isBonus) tags.push('🔥職業加成');
+                    if (dropsInfo.length > 0) tags.push(`🎲掉落: ${dropsInfo.join(' ')}`);
+                    log += ` [${tags.join(', ')}]`;
+                    let newLogs = [log, ...course.logs].slice(0, 20);
+                    if (levelUpInfo) newLogs = [`[${time}] 🎉 ${levelUpInfo} 升級了！`, ...newLogs];
+                    const newTotalCP = updatedStudents.reduce((acc, curr) => acc + curr.cp, 0);
+                    const currentBoss = BOSS_DEFINITIONS.find(b => b.id === course.bossId);
+                    let bossDefeatedNow = false;
+                    if (!course.isBossDefeated && newTotalCP >= currentBoss.hp) {
+                        bossDefeatedNow = true;
+                        newLogs = [`[${time}] 🏆 ${currentBoss.name} 被擊敗了！`, ...newLogs];
+                    }
+                    return { ...course, students: updatedStudents, logs: newLogs, isBossDefeated: course.isBossDefeated || bossDefeatedNow };
+                }));
+            };
+
+            const handleBuyItem = (item) => {
+                if (!targetStudent) return;
+                setCourses(prev => prev.map(c => {
+                    if (c.id !== activeCourseId) return c;
+                    const s = c.students.find(st => st.id === targetStudent.id);
+                    if (s.gp < item.cost) { showAlert('金幣不足！'); return c; }
+                    if (item.ownerId) { showAlert('該物品已被買走！'); return c; }
+                    if (s.inventory.length >= 5) { showAlert('背包已滿！請先捨棄舊道具。'); return c; }
+                    const updatedStudents = c.students.map(st => st.id !== targetStudent.id ? st : { ...st, gp: st.gp - item.cost, inventory: [...st.inventory, { ...item, ownerId: st.id }] });
+                    const updatedShop = c.shopItems.map(i => i.id === item.id ? { ...i, ownerId: s.id } : i);
+                    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    return { ...c, students: updatedStudents, shopItems: updatedShop, logs: [`[${time}] 🛍️ ${s.name} 購買了【${item.name}】！`, ...c.logs] };
+                }));
+                setIsShopModalOpen(false); setTargetStudent(null);
+            };
+
+            const handleDiscardItem = (student, itemIndex) => {
+                setDiscardTarget({ studentId: student.id, itemIndex: itemIndex, itemName: student.inventory[itemIndex].name, itemIcon: student.inventory[itemIndex].iconType });
+            };
+            const confirmDiscard = () => {
+                if (discardTarget) {
+                    setCourses(prev => prev.map(c => {
+                        if (c.id !== activeCourseId) return c;
+                        return { ...c, students: c.students.map(s => { if (s.id !== discardTarget.studentId) return s; const newInventory = [...s.inventory]; newInventory.splice(discardTarget.itemIndex, 1); return { ...s, inventory: newInventory }; }), logs: [`[系統] ${courses.find(co => co.id === activeCourseId).students.find(st => st.id === discardTarget.studentId).name} 丟棄了 ${discardTarget.itemName}`, ...c.logs] };
+                    }));
+                    setDiscardTarget(null);
+                }
+            };
+
+            const handleAddCourse = () => {
+                handleAdminCheck(() => {
+                    if (!newCourseName.trim()) return;
+                    setCourses([...courses, { id: `course-${Date.now()}`, name: newCourseName, icon: 'Map', students: [], logs: [`[系統] 副本建立`], bossId: 'slime', bossReward: '神秘獎勵', isBossDefeated: false, shopItems: JSON.parse(JSON.stringify(INITIAL_SHOP_ITEMS)) }]);
+                    setActiveCourseId(`course-${Date.now()}`);
+                    setNewCourseName('');
+                });
+            };
+
+            const openShop = (student, e) => { e.stopPropagation(); setTargetStudent(student); setIsShopModalOpen(true); };
+            const openBuffModal = (student) => { setTargetStudent(student); setIsBuffModalOpen(true); };
+            const openInventoryViewer = (student) => { setTargetStudent(student); setIsInventoryViewerOpen(true); };
+            const handleGrantBuff = () => { if (!targetStudent) return; const buffDef = getBuffInfo(selectedBuffId); setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === targetStudent.id ? { ...s, buffs: [...(s.buffs || []), { id: selectedBuffId, charges: buffDef.charges }] } : s), logs: [`🎁 老師賜予 ${targetStudent.name} ${buffDef.name}`, ...c.logs] } : c)); setIsBuffModalOpen(false); setTargetStudent(null); };
+
+            const openBossModal = () => {
+                handleAdminCheck(() => {
+                    setSelectedBossId(activeCourse.bossId);
+                    setCustomReward(activeCourse.bossReward);
+                    setIsBossModalOpen(true);
+                });
+            };
+
+            const handleSaveBoss = () => {
+                if (!customReward.trim()) return showAlert('請輸入獎勵！');
+                setCourses(prev => prev.map(c => {
+                    if (c.id !== activeCourseId) return c;
+                    const resetStudents = c.students.map(student => ({ ...student, cp: 0 }));
+                    return { ...c, bossId: selectedBossId, bossReward: customReward, isBossDefeated: false, students: resetStudents, logs: [`[系統] 新魔王出現！所有英雄 CP 已歸零。`, ...c.logs] };
+                }));
+                setIsBossModalOpen(false); setIsChestOpen(false); setShowRewardModal(false);
+            };
+
+            const handleOpenChest = () => { setIsChestOpen(true); setTimeout(() => setShowRewardModal(true), 1000); };
+            const handleDamage = (studentId, e) => { e.stopPropagation(); setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === studentId ? { ...s, hp: Math.max(0, s.hp - 2) } : s), logs: [`⚠️ ${c.students.find(s => s.id === studentId).name} 受傷 (-2 HP)`, ...c.logs] } : c)); };
+            const handleRemedy = (studentId) => { setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === studentId ? { ...s, hp: Math.max(0, s.hp - 2) } : s), logs: [`❤️‍🩹 ${c.students.find(s => s.id === studentId).name} 復活`, ...c.logs] } : c)); };
+
+            const submitNewStudent = () => {
+                handleAdminCheck(() => {
+                    if (!recruitName.trim()) return;
+                    setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: [...c.students, { id: Math.max(0, ...c.students.map(s => s.id)) + 1, name: recruitName, job: recruitJobId, lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 0, hp: MAX_HP, maxHp: MAX_HP, buffs: [], inventory: [] }], logs: [`[系統] ${recruitName} 加入`, ...c.logs] } : c));
+                    setRecruitName('');
+                    setIsStudentModalOpen(false);
+                });
+            };
+
+            const promptDeleteStudent = (id, e) => {
+                e.stopPropagation();
+                handleAdminCheck(() => {
+                    setDeleteTargetId(id);
+                });
+            };
+
+            const confirmDelete = () => {
+                if (deleteTargetId !== null) {
+                    setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.filter(s => s.id !== deleteTargetId) } : c));
+                    setDeleteTargetId(null);
+                }
+            };
+
+            const handleJobChange = () => { if (!targetStudent) return; setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === targetStudent.id ? { ...s, job: newJobId } : s), logs: [`🔄 ${targetStudent.name} 轉職`, ...c.logs] } : c)); setIsJobChangeModalOpen(false); };
+
+            if (!activeCourse) return <div className="p-10 text-white">載入中...</div>;
+
+            return (
+                <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
+                    {/* Sidebar */}
+                    <aside className={`${isSidebarOpen ? 'w-64' : 'w-16'} bg-slate-800 border-r border-slate-700 flex flex-col transition-all duration-300 relative z-20`}>
+                        <div className="p-4 border-b border-slate-700 flex items-center justify-between">
+                            {isSidebarOpen && <h2 className="font-bold text-lg text-white flex items-center gap-2"><Map className="text-yellow-500" /> 副本列表</h2>}
+                            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 hover:bg-slate-700 rounded text-slate-400"><Layout size={20} /></button>
+                        </div>
+
+                        {/* Admin Toggle & Backup Controls */}
+                        <div className="p-2 border-b border-slate-700 space-y-2">
+                            <button
+                                onClick={toggleAdminLock}
+                                className={`w-full py-2 rounded flex items-center justify-center gap-2 font-bold transition-all ${isAdminMode ? 'bg-red-900/30 text-red-400 border border-red-900/50' : 'bg-slate-700/30 text-slate-500 border border-transparent hover:bg-slate-700'}`}
+                                title={isAdminMode ? "管理員模式 (點擊鎖定)" : "訪客模式 (點擊解鎖)"}
+                            >
+                                {isAdminMode ? <Unlock size={16} /> : <Lock size={16} />}
+                                {isSidebarOpen && (isAdminMode ? "管理員模式" : "訪客模式")}
+                            </button>
+
+                            {isSidebarOpen && (
+                                <div className="flex gap-2">
+                                    <button onClick={handleExportData} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-1 rounded text-xs flex items-center justify-center gap-1" title="匯出紀錄">
+                                        <Download size={12} /> 匯出
+                                    </button>
+                                    <button onClick={handleImportClick} className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 py-1 rounded text-xs flex items-center justify-center gap-1" title="匯入紀錄">
+                                        <Upload size={12} /> 匯入
+                                    </button>
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleImportFile}
+                                        className="hidden"
+                                        accept=".json"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {courses.map(course => {
+                                const CourseIcon = window.LucideIcons[course.icon] || window.LucideIcons.HelpCircle;
+                                return (
+                                <button key={course.id} onClick={() => setActiveCourseId(course.id)} className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-colors ${activeCourseId === course.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-700'}`}>
+                                    <span className="shrink-0"><CourseIcon size={18} /></span>{isSidebarOpen && <div className="flex-1 min-w-0"><div className="font-medium truncate">{course.name}</div></div>}
+                                </button>
+                            )})}
+                        </div>
+                        {isSidebarOpen && <div className="p-4 border-t border-slate-700 flex gap-2"><input type="text" placeholder="新副本..." className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs" value={newCourseName} onChange={(e) => setNewCourseName(e.target.value)} /><button onClick={handleAddCourse} className="bg-slate-700 hover:bg-slate-600 text-white px-2 rounded"><PlusCircle size={16} /></button></div>}
+                    </aside>
+
+                    {/* Main Content */}
+                    <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+                        <header className="bg-slate-900 border-b border-slate-800 shadow-xl p-0 relative overflow-hidden shrink-0">
+                            <div className={`absolute inset-0 opacity-20 ${isDefeated ? 'bg-yellow-600' : 'bg-red-900'}`}></div>
+                            <div className="max-w-6xl mx-auto p-4 relative z-10">
+                                <div className="flex flex-col md:flex-row items-center gap-6">
+                                    <div className="relative cursor-pointer group shrink-0" onClick={openBossModal}>
+                                        <div className={`w-24 h-24 md:w-32 md:h-32 rounded-full border-4 flex items-center justify-center text-6xl shadow-2xl transition-transform transform group-hover:scale-105 ${isDefeated ? 'bg-yellow-900/50 border-yellow-500 grayscale' : 'bg-red-900/50 border-red-500'}`}>{isDefeated ? '💀' : activeBoss.avatar}</div>
+                                        {!isDefeated && <div className="absolute -bottom-2 -right-2 bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold animate-bounce">BOSS</div>}
+                                        <div className="absolute top-0 right-0 bg-slate-800 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">
+                                            {isAdminMode ? <Edit size={12} className="text-white" /> : <Lock size={12} className="text-slate-400" />}
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 w-full">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <div><h2 className="text-2xl font-black text-white flex items-center gap-2 drop-shadow-md">{activeBoss.name} <span className="text-xs px-2 py-0.5 rounded border border-red-500 text-red-500">{activeBoss.difficulty}</span></h2><p className="text-slate-400 text-sm mt-1">{activeBoss.desc}</p></div>
+                                            <div className="text-right"><div className="text-3xl font-mono font-bold text-white tracking-tighter">{totalCP} <span className="text-sm text-slate-500">/ {activeBoss.hp} CP</span></div></div>
+                                        </div>
+                                        <div className="h-6 bg-slate-800 rounded-full overflow-hidden border border-slate-700 relative shadow-inner">
+                                            <div className={`h-full transition-all duration-1000 ease-out flex items-center justify-end pr-2 ${isDefeated ? 'bg-yellow-500' : 'bg-gradient-to-r from-red-600 to-red-400'}`} style={{ width: `${damagePercent}%` }}></div>
+                                        </div>
+                                    </div>
+                                    <div className="shrink-0 flex flex-col items-center justify-center w-24">
+                                        {isDefeated ? <button onClick={handleOpenChest} className="animate-bounce text-5xl">{isChestOpen ? '💰' : '🎁'}</button> : <div className="opacity-30 grayscale flex flex-col items-center"><div className="text-5xl">🔒</div><span className="text-xs text-slate-500">上鎖</span></div>}
+                                    </div>
+                                </div>
+                            </div>
+                        </header>
+
+                        <div className="flex-1 overflow-y-auto p-4 pb-6 scrollbar-thin scrollbar-thumb-slate-600">
+                            <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="md:col-span-2 space-y-6">
+                                    <button onClick={() => setIsStudentModalOpen(true)} className="w-full bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/50 text-indigo-300 p-3 rounded-xl flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"><PlusCircle size={20} /> 召喚新英雄</button>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {activeCourse.students.map(student => {
+                                            const job = getJobInfo(student.job);
+                                            const isDead = student.hp <= 0;
+                                            const highestRarity = getHighestRarity(student.inventory);
+                                            const rarityStyle = RARITY_STYLES[highestRarity];
+                                            const AvatarComponent = job.AvatarComponent || WarriorAvatar;
+
+                                            return (
+                                                <div key={student.id} onClick={() => openInventoryViewer(student)} className={`cursor-pointer bg-slate-800 rounded-xl p-4 border shadow-md transition-all group relative h-full flex flex-col justify-between ${isDead ? 'border-red-500/50 opacity-80' : 'border-slate-700 hover:border-indigo-500 hover:shadow-indigo-500/20'}`}>
+                                                    {isDead && (
+                                                        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/80 backdrop-blur-sm rounded-xl flex-col gap-3 p-4 text-center animate-fadeIn">
+                                                            <div className="text-red-500 font-black flex items-center gap-2 text-xl animate-bounce">
+                                                                <Skull size={28} /> 力竭倒地
+                                                            </div>
+                                                            <p className="text-slate-400 text-xs font-medium">
+                                                                請完成指定任務以復活
+                                                            </p>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleRemedy(student.id); }}
+                                                                className="bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1 shadow-lg shadow-green-900/20 transition-all hover:scale-105 border border-green-400/30"
+                                                            >
+                                                                <Bandage size={14} /> 確認復活
+                                                            </button>
+                                                        </div>
+                                                    )}
+
+                                                    <div className="flex-1">
+                                                        <div className="flex items-start gap-4">
+                                                            <div className={`w-14 h-14 rounded-lg flex items-center justify-center relative shrink-0 border-2 overflow-hidden bg-slate-900 ${rarityStyle.border} ${rarityStyle.shadow} transition-all duration-500`}>
+                                                                <AvatarComponent className="w-full h-full" isAnimated={false} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-start">
+                                                                    <div><h3 className="text-base font-bold truncate text-white flex items-center gap-1">{student.name} <Search size={12} className="text-slate-500" /></h3><div className="text-xs text-indigo-300">LV.{student.lv} {job.name}</div></div>
+                                                                    <div className="text-right">
+                                                                        <div className="text-yellow-400 font-bold text-xs flex items-center justify-end gap-1"><Award size={12} /> {student.cp}</div>
+                                                                        <div className="text-green-400 font-bold text-xs flex items-center justify-end gap-1 mt-0.5"><Coins size={12} /> {student.gp}</div>
+
+                                                                        {!isDead && (
+                                                                            <button
+                                                                                onClick={(e) => openShop(student, e)}
+                                                                                className="mt-2 bg-gradient-to-b from-amber-500 to-amber-700 border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 text-white text-[10px] font-bold px-2 py-1 rounded shadow-md hover:scale-110 flex items-center justify-center gap-1 w-full"
+                                                                            >
+                                                                                <ShoppingBag size={10} /> 商店
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="mt-1 mb-1">
+                                                                    <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold px-0.5">
+                                                                        <span>EXP</span>
+                                                                        <span>{student.xp}/{student.maxXp}</span>
+                                                                    </div>
+                                                                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-700 relative group/xp" title={`經驗值: ${student.xp}/${student.maxXp}`}>
+                                                                        <div className="h-full bg-sky-500 rounded-full transition-all duration-500" style={{ width: `${(student.xp / student.maxXp) * 100}%` }} />
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2">
+                                                                    <Heart size={10} className="text-red-400 shrink-0" />
+                                                                    <div className="flex-1 h-2 bg-slate-900 rounded-full overflow-hidden border border-slate-700 relative"><div className={`h-full ${student.hp <= 3 ? 'bg-red-600 animate-pulse' : 'bg-red-500'}`} style={{ width: `${(student.hp / student.maxHp) * 100}%` }} /></div>
+                                                                    <button onClick={(e) => handleDamage(student.id, e)} disabled={isDead} className="text-slate-500 hover:text-red-400 hover:scale-110 p-1"><Activity size={12} /></button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="mt-3 h-8 flex gap-1 items-center overflow-x-auto scrollbar-hide">
+                                                            {student.buffs?.length > 0 ? (
+                                                                student.buffs.map((buff, i) => {
+                                                                    const d = getBuffInfo(buff.id);
+                                                                    return (
+                                                                        <div key={`b-${i}`} className="shrink-0 bg-slate-900/80 px-1.5 py-0.5 text-[9px] rounded text-slate-300 flex items-center gap-1 border border-slate-700 shadow-sm">
+                                                                            {renderItemIcon(d.iconType, "w-3 h-3 inline mr-1")} {d.name} x{buff.charges}
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            ) : (
+                                                                <span className="text-[9px] text-slate-600 italic px-1">無狀態</span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="mt-2 bg-slate-900/60 p-2 rounded-lg border border-slate-700/50 shadow-inner">
+                                                            <div className="flex items-center justify-between mb-1.5">
+                                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                                    <Briefcase size={10} /> 背包 (Bag)
+                                                                </div>
+                                                                <span className="text-[9px] text-slate-600">{student.inventory.length}/5</span>
+                                                            </div>
+                                                            <div className="flex gap-1.5">
+                                                                {student.inventory.slice(0, 5).map((item, i) => (
+                                                                    <div key={`inv-${i}`} className={`w-7 h-7 rounded bg-slate-800 border ${RARITY_STYLES[item.rarity].border} flex items-center justify-center text-sm shadow-sm relative group/icon cursor-help`}>
+                                                                            {renderItemIcon(item.iconType, "w-4 h-4")}
+                                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-[10px] rounded whitespace-nowrap opacity-0 group-hover/icon:opacity-100 pointer-events-none z-30 border border-slate-600">
+                                                                            {item.name}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                                {[...Array(Math.max(0, 5 - student.inventory.length))].map((_, i) => (
+                                                                    <div key={`empty-${i}`} className="w-7 h-7 rounded bg-slate-800/30 border border-slate-700/50 flex items-center justify-center">
+                                                                        <div className="w-1 h-1 rounded-full bg-slate-800"></div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-2 grid grid-cols-2 gap-2 relative">
+                                                        {QUESTS.map(quest => {
+                                                            const isBonus = job.bonus === quest.type;
+                                                            return <button key={quest.id} onClick={(e) => { e.stopPropagation(); handleCompleteQuest(student.id, quest) }} disabled={isDead} className={`flex items-center gap-2 text-[10px] p-1.5 rounded transition-colors text-left overflow-hidden ${isDead ? 'opacity-50' : (isBonus ? 'bg-indigo-900/40 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-600 hover:text-white' : 'bg-slate-700/50 text-slate-300 hover:bg-slate-600')}`}><span className="shrink-0">{quest.icon}</span><span className="truncate flex-1">{quest.title}</span>{isBonus && !isDead && <span className="text-[8px] text-yellow-400">UP</span>}</button>;
+                                                        })}
+                                                    </div>
+
+                                                    {!isDead && (
+                                                        <button
+                                                            onClick={(e) => promptDeleteStudent(student.id, e)}
+                                                            className="absolute top-2 right-2 p-1 text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                                                            title="移除英雄"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                <div className="md:col-span-1">
+                                    <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-lg h-full max-h-[500px] flex flex-col">
+                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2"><BookOpen size={14} /> 冒險日誌</h3>
+                                        <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-slate-600">
+                                            {activeCourse.logs.map((log, idx) => (
+                                                <div key={idx} className={`text-xs border-l-2 pl-2 py-0.5 ${log.includes('警示') ? 'text-red-300 border-red-500' : (log.includes('掉落') ? 'text-purple-300 border-purple-500' : (log.includes('購買') ? 'text-yellow-300 border-yellow-500' : 'text-slate-300 border-indigo-500'))}`}>{log}</div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* --- Modals --- */}
+                    <Modal
+                        type={modalConfig.type}
+                        message={modalConfig.message}
+                        onConfirm={modalConfig.onConfirm}
+                        onCancel={() => setModalConfig({ type: null, message: '', onConfirm: null })}
+                    />
+
+                    {isPasswordModalOpen && (
+                        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="bg-slate-900 p-8 rounded-2xl border border-indigo-500 w-full max-w-sm shadow-2xl">
+                                <div className="w-16 h-16 bg-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-indigo-500/50">
+                                    <Shield size={32} className="text-indigo-400" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2 text-center">
+                                    {passwordMode === 'SET' ? '設定管理密碼' : '管理員驗證'}
+                                </h3>
+                                <p className="text-slate-400 text-sm mb-6 text-center">
+                                    {passwordMode === 'SET'
+                                        ? '請設定一組密碼以保護管理功能。'
+                                        : '請輸入密碼以解鎖管理權限。'}
+                                </p>
+
+                                <input
+                                    type="password"
+                                    className="w-full bg-slate-800 border border-slate-600 rounded p-3 text-white mb-6 text-center tracking-widest text-lg focus:border-indigo-500 focus:outline-none"
+                                    placeholder="Password"
+                                    value={passwordInput}
+                                    onChange={(e) => setPasswordInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+                                    autoFocus
+                                />
+
+                                <div className="flex gap-3">
+                                    <button onClick={() => { setIsPasswordModalOpen(false); setPendingAction(null); }} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold">取消</button>
+                                    <button onClick={handlePasswordSubmit} className="flex-1 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 font-bold">確認</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {deleteTargetId !== null && (
+                        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="bg-slate-900 p-6 rounded-2xl border border-red-600 w-full max-w-sm shadow-2xl text-center">
+                                <div className="w-16 h-16 bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/50">
+                                    <AlertTriangle size={32} className="text-red-500" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2">移除英雄？</h3>
+                                <p className="text-slate-400 text-sm mb-6">確定要讓這位英雄離開隊伍嗎？此操作無法復原。</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setDeleteTargetId(null)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold">取消</button>
+                                    <button onClick={confirmDelete} className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 font-bold">移除</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {discardTarget && (
+                        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="bg-slate-900 p-6 rounded-2xl border border-slate-600 w-full max-w-sm shadow-2xl text-center">
+                                <div className="w-16 h-16 bg-slate-800 rounded-xl flex items-center justify-center mx-auto mb-4 border border-slate-600">
+                                    {renderItemIcon(discardTarget.itemIcon, "w-10 h-10")}
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-2">丟棄道具？</h3>
+                                <p className="text-slate-400 text-sm mb-6">您確定要丟棄 <span className="text-white font-bold">{discardTarget.itemName}</span> 嗎？此操作無法復原。</p>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setDiscardTarget(null)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold">保留</button>
+                                    <button onClick={confirmDiscard} className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500 font-bold">丟棄</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {isInventoryViewerOpen && targetStudent && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="bg-slate-900 rounded-2xl border-2 border-slate-600 w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden relative">
+                                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-indigo-900/50 to-transparent pointer-events-none"></div>
+
+                                <div className="p-4 border-b border-slate-700 flex justify-between items-center relative z-10 bg-slate-900/80">
+                                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <Users size={20} className="text-indigo-400" /> 英雄形象卡 (Hero Card)
+                                    </h2>
+                                    <button onClick={() => setIsInventoryViewerOpen(false)} className="text-slate-400 hover:text-white p-2 rounded hover:bg-slate-800"><X size={24} /></button>
+                                </div>
+
+                                <div className="p-6 overflow-y-auto bg-slate-900/50 flex-1 grid grid-cols-1 md:grid-cols-5 gap-8">
+                                    <div className="md:col-span-2">
+                                        <div className="group/card perspective-1000 relative h-full min-h-[400px]">
+                                            <div className={`relative h-full rounded-3xl overflow-hidden shadow-2xl border-4 border-slate-800 flex flex-col items-center transition-transform duration-500 transform group-hover:-translate-y-1 group-hover:-translate-x-1 preserve-3d`}>
+                                                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-20 pointer-events-none" style={{ backgroundBlendMode: 'overlay' }}></div>
+                                                <div className={`absolute inset-0 bg-gradient-to-br ${getJobInfo(targetStudent.job).themeColor} opacity-90`}></div>
+                                                <div className="relative z-10 flex-1 w-full flex flex-col items-center justify-center p-8 transform translate-z-10 group-hover:translate-z-20 transition-transform">
+                                                    <div className="relative">
+                                                        <div className="w-48 h-48 filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.6)] z-10 transition-transform duration-500 group-hover:scale-110">
+                                                            {(() => {
+                                                                const JobAvatar = getJobInfo(targetStudent.job).AvatarComponent || WarriorAvatar;
+                                                                return <JobAvatar className="w-full h-full" isAnimated={false} />;
+                                                            })()}
+                                                        </div>
+                                                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:-translate-y-[10px]">
+                                                            <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'head') ? RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'head').rarity].border : 'border-white/20 border-dashed'}`}>
+                                                                {getEquippedItem(targetStudent.inventory, 'head') ? renderItemIcon(getEquippedItem(targetStudent.inventory, 'head').iconType, "text-2xl") : <Crown size={16} className="text-white/30" />}
+                                                            </div>
+                                                            {getEquippedItem(targetStudent.inventory, 'head') && <div className="absolute bottom-full mb-1 bg-black px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">{getEquippedItem(targetStudent.inventory, 'head').name}</div>}
+                                                        </div>
+                                                        <div className="absolute top-1/2 -left-12 -translate-y-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:-translate-x-[-10px]">
+                                                            <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'weapon') ? RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'weapon').rarity].border : 'border-white/20 border-dashed'}`}>
+                                                                {getEquippedItem(targetStudent.inventory, 'weapon') ? renderItemIcon(getEquippedItem(targetStudent.inventory, 'weapon').iconType, "text-2xl") : <Swords size={16} className="text-white/30" />}
+                                                            </div>
+                                                            {getEquippedItem(targetStudent.inventory, 'weapon') && <div className="absolute right-full mr-2 bg-black px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">{getEquippedItem(targetStudent.inventory, 'weapon').name}</div>}
+                                                        </div>
+                                                        <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:translate-x-[10px]">
+                                                            <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand') ? RARITY_STYLES[(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).rarity].border : 'border-white/20 border-dashed'}`}>
+                                                                {(getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')) ? renderItemIcon((getEquippedItem(targetStudent.inventory, 'accessory') || getEquippedItem(targetStudent.inventory, 'offhand')).iconType, "text-2xl") : <Shield size={16} className="text-white/30" />}
+                                                            </div>
+                                                        </div>
+                                                        <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 group/item transition-transform group-hover:translate-y-[10px]">
+                                                            <div className={`w-12 h-12 rounded-full border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center shadow-lg transition-transform hover:scale-110 ${getEquippedItem(targetStudent.inventory, 'feet') ? RARITY_STYLES[getEquippedItem(targetStudent.inventory, 'feet').rarity].border : 'border-white/20 border-dashed'}`}>
+                                                                {getEquippedItem(targetStudent.inventory, 'feet') ? renderItemIcon(getEquippedItem(targetStudent.inventory, 'feet').iconType, "text-2xl") : <Footprints size={16} className="text-white/30" />}
+                                                            </div>
+                                                            {getEquippedItem(targetStudent.inventory, 'feet') && <div className="absolute top-full mt-1 bg-black px-2 py-1 rounded text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity border border-slate-600">{getEquippedItem(targetStudent.inventory, 'feet').name}</div>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="relative z-10 w-full bg-black/40 backdrop-blur-md p-4 text-center border-t border-white/10">
+                                                    <h3 className="text-2xl font-black text-white">{targetStudent.name}</h3>
+                                                    <div className={`text-sm font-bold uppercase tracking-widest ${getJobInfo(targetStudent.job).lightColor} mt-1`}>{getJobInfo(targetStudent.job).name}</div>
+                                                    <div className="flex justify-center gap-3 mt-3">
+                                                        <div className="px-3 py-1 bg-black/50 rounded-full text-xs text-yellow-400 font-bold border border-yellow-500/30">LV. {targetStudent.lv}</div>
+                                                        <div className="px-3 py-1 bg-black/50 rounded-full text-xs text-red-400 font-bold border border-red-500/30">HP {targetStudent.hp}/{MAX_HP}</div>
+                                                    </div>
+                                                    <div className="w-full h-1.5 bg-black/50 rounded-full mt-4 overflow-hidden"><div className="h-full bg-white/80" style={{ width: `${(targetStudent.hp / MAX_HP) * 100}%` }}></div></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-3 flex flex-col h-full">
+                                        <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700 grid grid-cols-3 gap-4 mb-6">
+                                            <div className="text-center p-3 rounded-lg bg-slate-800 border border-slate-700 shadow-sm">
+                                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">CP (勇氣)</div>
+                                                <div className="text-2xl font-black text-yellow-400">{targetStudent.cp}</div>
+                                            </div>
+                                            <div className="text-center p-3 rounded-lg bg-slate-800 border border-slate-700 shadow-sm">
+                                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">GP (金幣)</div>
+                                                <div className="text-2xl font-black text-green-400">{targetStudent.gp}</div>
+                                            </div>
+                                            <div className="text-center p-3 rounded-lg bg-slate-800 border border-slate-700 shadow-sm">
+                                                <div className="text-xs text-slate-400 mb-1 uppercase tracking-wider">背包</div>
+                                                <div className="text-2xl font-black text-blue-400">{targetStudent.inventory.length}</div>
+                                            </div>
+                                        </div>
+                                        <div className="mb-4 bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+                                            <div className="p-3 bg-slate-800/50 border-b border-slate-700 font-bold text-slate-300 flex items-center gap-2">
+                                                <Zap size={16} className="text-yellow-400" /> 生效中的增益 (Active Buffs)
+                                            </div>
+                                            {targetStudent.buffs.length === 0 ? (
+                                                <div className="p-4 text-center text-slate-500 text-sm italic">目前無增益狀態</div>
+                                            ) : (
+                                                <div className="p-3 grid grid-cols-2 gap-2">
+                                                    {targetStudent.buffs.map((buff, idx) => {
+                                                        const d = getBuffInfo(buff.id);
+                                                        return (
+                                                            <div key={idx} className="flex items-center gap-3 bg-slate-800 p-2 rounded border border-slate-600">
+                                                                <div className="w-8 h-8 flex items-center justify-center bg-slate-900 rounded border border-slate-700">
+                                                                    {renderItemIcon(d.iconType, `w-5 h-5 ${d.color}`)}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-bold text-white text-xs">{d.name}</div>
+                                                                    <div className="text-[10px] text-slate-400">剩餘: {buff.charges} 次</div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-h-0 flex flex-col bg-slate-800/30 rounded-xl border border-slate-700 overflow-hidden">
+                                            <div className="p-3 bg-slate-800/50 border-b border-slate-700 font-bold text-slate-300 flex items-center gap-2">
+                                                <Briefcase size={16} /> 道具欄位 (Inventory)
+                                            </div>
+                                            {targetStudent.inventory.length === 0 ? (
+                                                <div className="flex-1 flex items-center justify-center text-slate-500 text-sm italic p-8">
+                                                    背包空空如也，快去商店採購吧！
+                                                </div>
+                                            ) : (
+                                                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                                                    {targetStudent.inventory.map((item, idx) => (
+                                                        <div key={idx} className={`relative p-3 rounded-lg border bg-slate-800 flex items-center gap-4 transition-transform hover:-translate-x-1 ${RARITY_STYLES[item.rarity].border}`}>
+                                                            <div className="w-12 h-12 rounded-md flex items-center justify-center text-2xl bg-slate-900 border border-slate-700 shadow-inner">
+                                                                {renderItemIcon(item.iconType, "w-6 h-6")}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <h4 className={`text-sm font-bold ${RARITY_STYLES[item.rarity].text} truncate`}>{item.name}</h4>
+                                                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-slate-400 uppercase tracking-wider">{item.slot || 'item'}</span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-400 truncate">{item.desc}</p>
+                                                            </div>
+                                                            <button onClick={() => handleDiscardItem(targetStudent, idx)} className="p-2 text-slate-500 hover:text-red-500 transition-colors title='丟棄道具'">
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="mt-6 grid grid-cols-3 gap-3">
+                                            <button onClick={() => { setIsInventoryViewerOpen(false); openBuffModal(targetStudent); }} className="bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all hover:scale-[1.02] text-xs"><Gift size={16} /> 賜予道具</button>
+                                            <button onClick={() => { setIsInventoryViewerOpen(false); setTargetStudent(targetStudent); setNewJobId(targetStudent.job); setIsJobChangeModalOpen(true); }} className="bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-slate-700/20 transition-all hover:scale-[1.02] text-xs"><RefreshCcw size={16} /> 轉職</button>
+                                            <button onClick={(e) => openShop(targetStudent, e)} className="bg-gradient-to-b from-amber-500 to-amber-700 border-b-4 border-amber-900 active:border-b-0 active:translate-y-1 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-amber-600/20 transition-all hover:scale-110 text-xs"><ShoppingBag size={16} /> 進入商店</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {isStudentModalOpen && (
+                        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 rounded-2xl w-full max-w-2xl p-6 border border-slate-600">
+                                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-white">英雄召喚</h2><button onClick={() => setIsStudentModalOpen(false)}><X /></button></div>
+                                <input className="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white mb-4 placeholder='姓名'" value={recruitName} onChange={e => setRecruitName(e.target.value)} />
+                                <div className="grid grid-cols-2 gap-4 mb-4">{JOB_DEFINITIONS.map(j => <button key={j.id} onClick={() => setRecruitJobId(j.id)} className={`p-4 border rounded ${recruitJobId === j.id ? 'bg-indigo-600/50 border-indigo-500' : 'border-slate-600'}`}><div>{j.icon} {j.name}</div></button>)}</div>
+                                <button onClick={submitNewStudent} className="w-full bg-indigo-600 py-2 rounded text-white font-bold">召喚</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {isShopModalOpen && targetStudent && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="bg-slate-900 rounded-2xl border border-slate-600 w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+                                <div className="p-6 border-b border-slate-700 flex justify-between items-center bg-green-900/20">
+                                    <div>
+                                        <h2 className="text-2xl font-black text-green-400 flex items-center gap-2"><ShoppingBag /> 哥布林黑市</h2>
+                                        <p className="text-sm text-green-300 mt-1">顧客：{targetStudent.name} (持有金幣: {targetStudent.gp} GP)</p>
+                                    </div>
+                                    <button onClick={() => setIsShopModalOpen(false)} className="text-slate-400 hover:text-white"><X size={24} /></button>
+                                </div>
+                                <div className="p-6 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                        {activeCourse.shopItems.map(item => (
+                                            <div key={item.id} className={`relative p-4 rounded-xl border-2 bg-slate-800 flex flex-col gap-3 group transition-all hover:-translate-y-1 hover:shadow-xl ${RARITY_STYLES[item.rarity].border} ${item.ownerId ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}>
+                                                <div className="flex justify-between items-start">
+                                                    <div className="text-4xl bg-slate-900 w-16 h-16 rounded-lg flex items-center justify-center border border-slate-700">
+                                                        {renderItemIcon(item.iconType, "w-8 h-8")}
+                                                    </div>
+                                                    <div className="text-xs font-bold px-2 py-1 rounded bg-slate-900 border border-slate-600">{item.rarity}</div>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-white">{item.name}</h3>
+                                                    <p className="text-xs text-slate-400 mt-1 h-10">{item.desc}</p>
+                                                </div>
+                                                <div className="mt-auto pt-3 border-t border-slate-700 flex justify-between items-center">
+                                                    {item.ownerId ? <span className="text-red-500 font-bold flex items-center gap-1"><Lock size={14} /> 已售出</span> : <div className="text-green-400 font-bold flex items-center gap-1"><Coins size={14} /> {item.cost}</div>}
+                                                    {!item.ownerId && <button onClick={() => handleBuyItem(item)} disabled={targetStudent.gp < item.cost} className="px-3 py-1 bg-green-600 hover:bg-green-500 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs font-bold rounded shadow">購買</button>}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {isBuffModalOpen && targetStudent && (
+                        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 rounded-2xl w-full max-w-lg p-6 border border-slate-600">
+                                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-white">賜予道具</h2><button onClick={() => setIsBuffModalOpen(false)}><X /></button></div>
+                                <div className="space-y-2">{BUFF_DEFINITIONS.map(b => <button key={b.id} onClick={() => setSelectedBuffId(b.id)} className={`w-full p-3 border rounded text-left flex items-center gap-3 ${selectedBuffId === b.id ? 'bg-blue-900/50 border-blue-500' : 'bg-slate-900 border-slate-700'}`}>{renderItemIcon(b.iconType, `w-6 h-6 ${b.color}`)} <div><div className="font-bold text-white">{b.name}</div><div className="text-xs text-slate-400">{b.desc}</div></div></button>)}</div>
+                                <button onClick={handleGrantBuff} className="w-full bg-blue-600 py-2 rounded text-white font-bold mt-4">發放</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {isJobChangeModalOpen && targetStudent && (
+                        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-800 rounded-2xl w-full max-w-lg p-6 border border-slate-600">
+                                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-white">轉職</h2><button onClick={() => setIsJobChangeModalOpen(false)}><X /></button></div>
+                                <div className="grid grid-cols-2 gap-4">{JOB_DEFINITIONS.map(j => <button key={j.id} onClick={() => setNewJobId(j.id)} className={`p-4 border rounded ${newJobId === j.id ? 'bg-indigo-600/50 border-indigo-500' : 'border-slate-600'}`}><div>{j.icon} {j.name}</div></button>)}</div>
+                                <button onClick={handleJobChange} className="w-full bg-indigo-600 py-2 rounded text-white font-bold mt-4">確認</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {isBossModalOpen && (
+                        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                            <div className="bg-slate-900 w-full max-w-2xl p-6 rounded-2xl border border-slate-600">
+                                <h2 className="text-2xl font-bold text-red-500 mb-4">魔王設定</h2>
+                                <div className="grid grid-cols-2 gap-4 mb-4">{BOSS_DEFINITIONS.map(b => <button key={b.id} onClick={() => setSelectedBossId(b.id)} className={`p-4 border rounded flex items-center gap-2 ${selectedBossId === b.id ? 'border-red-500 bg-red-900/20' : 'border-slate-700'}`}><span className="text-2xl">{b.avatar}</span><div><div className="font-bold text-white">{b.name}</div><div className="text-xs text-slate-400">HP: {b.hp}</div></div></button>)}</div>
+                                <input className="w-full bg-slate-800 border border-slate-600 rounded p-3 text-white mb-4 placeholder='寶箱獎勵內容...'" value={customReward} onChange={e => setCustomReward(e.target.value)} />
+                                <div className="flex justify-end gap-2"><button onClick={() => setIsBossModalOpen(false)} className="text-slate-400 px-4">取消</button><button onClick={handleSaveBoss} className="bg-red-600 text-white px-6 py-2 rounded font-bold">召喚</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {showRewardModal && (
+                        <div className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="text-center">
+                                <Trophy size={80} className="mx-auto text-yellow-400 mb-4 animate-bounce" />
+                                <h2 className="text-4xl font-bold text-white mb-4">魔王擊敗！</h2>
+                                <div className="bg-slate-800 p-8 rounded-xl border-2 border-yellow-500 mb-8"><p className="text-slate-400 text-sm mb-2">寶箱獎勵</p><p className="text-2xl text-white font-bold">{activeCourse.bossReward}</p></div>
+                                <button onClick={() => setShowRewardModal(false)} className="bg-white text-black px-8 py-3 rounded-full font-bold">領取</button>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<AppContainer />);
+    </script>
+</body>
+</html>
