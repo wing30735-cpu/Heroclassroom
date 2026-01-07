@@ -23,6 +23,7 @@
                     animation: {
                         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                         'fadeIn': 'fadeIn 0.3s ease-out forwards',
+                        'bounce-slow': 'bounce 2s infinite',
                     },
                     keyframes: {
                         fadeIn: {
@@ -35,7 +36,7 @@
         }
     </script>
 
-    <!-- 5. Import Map -->
+    <!-- 5. Import Map: 解決 Failed to resolve module specifier 'react' 錯誤 -->
     <script type="importmap">
         {
             "imports": {
@@ -428,6 +429,12 @@
                 { id: 'golden_egg', name: '幸運金蛋', iconType: 'egg', desc: '下 1 次任務獎勵全面 2 倍', charges: 1, type: 'all', value: 2.0, color: 'text-yellow-400' },
             ];
 
+            const CHALLENGE_MONSTERS = [
+                { name: '愛問問題的史萊姆', icon: '💧', desc: '它想考考你的反應！' },
+                { name: '頑皮的哥布林', icon: '👺', desc: '不回答正確就不讓你走！' },
+                { name: '博學的貓頭鷹', icon: '🦉', desc: '智慧的考驗來了！' }
+            ];
+
             const INITIAL_SHOP_ITEMS = [
                 { id: 'rusty_sword', name: '生鏽的鐵劍', rarity: 'COMMON', cost: 150, iconType: 'sword', type: 'buff', buffType: 'cp', value: 0.05, slot: 'weapon', desc: '雖然有點鈍，但總比空手好。CP +5%。', ownerId: null },
                 { id: 'leather_boots', name: '皮革靴', rarity: 'COMMON', cost: 150, iconType: 'feet', type: 'buff', buffType: 'gp', value: 0.05, slot: 'feet', desc: '輕便好走，讓你跑腿更有效率。GP +5%。', ownerId: null },
@@ -461,8 +468,8 @@
                     name: '數學迷宮',
                     icon: 'Calculator',
                     students: [
-                        { id: 1, name: '小明', job: 'warrior', lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 50, hp: 10, maxHp: 10, buffs: [], inventory: [] },
-                        { id: 2, name: '小華', job: 'mage', lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 50, hp: 10, maxHp: 10, buffs: [], inventory: [] },
+                        { id: 1, name: '小明', job: 'warrior', lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 50, hp: 10, maxHp: 10, buffs: [], inventory: [], jobChangeCount: 0 },
+                        { id: 2, name: '小華', job: 'mage', lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 50, hp: 10, maxHp: 10, buffs: [], inventory: [], jobChangeCount: 0 },
                     ],
                     logs: [],
                     bossId: 'slime',
@@ -517,6 +524,10 @@
             // NEW: Edit Student Modal State
             const [isEditStudentModalOpen, setIsEditStudentModalOpen] = useState(false);
             const [editingStudent, setEditingStudent] = useState(null);
+
+            // NEW: Challenge Modal State
+            const [isChallengeModalOpen, setIsChallengeModalOpen] = useState(false);
+            const [activeChallenge, setActiveChallenge] = useState(null);
 
             // Effects
             useEffect(() => {
@@ -697,15 +708,34 @@
             };
 
             const handleCompleteQuest = (studentId, quest) => {
+                // 0. Prevent double trigger if modal is already open
+                if (isChallengeModalOpen) return;
+
+                // 1. Find current data synchronously
+                const currentCourse = courses.find(c => c.id === activeCourseId);
+                if (!currentCourse) return;
+                
+                const student = currentCourse.students.find(s => s.id === studentId);
+                if (!student || student.hp <= 0) {
+                    if (student) showAlert(`${student.name} 力竭中！`);
+                    return;
+                }
+
+                // 2. Determine random challenge synchronously
+                // Trigger only if boss is alive and random chance met (40% chance)
+                // Also added check to ensure we don't trigger if already active
+                const triggerChallenge = !currentCourse.isBossDefeated && Math.random() < 0.4 && !activeChallenge;
+
+                // 3. Update State for Quest Completion (Standard Rewards)
                 setCourses(prev => prev.map(course => {
                     if (course.id !== activeCourseId) return course;
-                    const student = course.students.find(s => s.id === studentId);
-                    if (student.hp <= 0) { showAlert(`${student.name} 力竭中！`); return course; }
+                    
                     let levelUpInfo = null;
                     let dropsInfo = [];
+
                     const updatedStudents = course.students.map(s => {
                         if (s.id !== studentId) return s;
-                        if (s.hp <= 0) return s;
+                        
                         const rewards = calculateRewards(s, quest);
                         let dropGP = 0;
                         let dropBuffs = [];
@@ -727,6 +757,7 @@
                         finalBuffs = [...finalBuffs, ...dropBuffs];
                         return { ...s, lv: newLv, xp: newXp, maxXp: newMaxXp, cp: s.cp + rewards.finalCP, gp: s.gp + rewards.finalGP + dropGP, buffs: finalBuffs };
                     });
+
                     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     const r = calculateRewards(student, quest);
                     let log = `[${time}] ⚔️ ${student.name} 完成任務`;
@@ -734,17 +765,58 @@
                     if (r.isBonus) tags.push('🔥職業加成');
                     if (dropsInfo.length > 0) tags.push(`🎲掉落: ${dropsInfo.join(' ')}`);
                     log += ` [${tags.join(', ')}]`;
+                    
                     let newLogs = [log, ...course.logs].slice(0, 20);
                     if (levelUpInfo) newLogs = [`[${time}] 🎉 ${levelUpInfo} 升級了！`, ...newLogs];
+                    
                     const newTotalCP = updatedStudents.reduce((acc, curr) => acc + curr.cp, 0);
                     const currentBoss = BOSS_DEFINITIONS.find(b => b.id === course.bossId);
                     let bossDefeatedNow = false;
+                    
                     if (!course.isBossDefeated && newTotalCP >= currentBoss.hp) {
                         bossDefeatedNow = true;
                         newLogs = [`[${time}] 🏆 ${currentBoss.name} 被擊敗了！`, ...newLogs];
                     }
+
                     return { ...course, students: updatedStudents, logs: newLogs, isBossDefeated: course.isBossDefeated || bossDefeatedNow };
                 }));
+
+                // 4. Open Challenge Modal if triggered
+                if (triggerChallenge) {
+                     const monster = CHALLENGE_MONSTERS[Math.floor(Math.random() * CHALLENGE_MONSTERS.length)];
+                     // Set challenge state
+                     setActiveChallenge({ studentId, studentName: student.name, monster });
+                     // Open modal with slight delay to separate from quest completion animation if any
+                     setTimeout(() => setIsChallengeModalOpen(true), 500); 
+                }
+            };
+
+            const handleChallengeResolve = (success) => {
+                if (!activeChallenge) return;
+                
+                setCourses(prev => prev.map(c => {
+                    if (c.id !== activeCourseId) return c;
+                    
+                    const logMsg = success 
+                        ? `[挑戰] ${activeChallenge.studentName} 成功回答了 ${activeChallenge.monster.name} 的問題！(大獎勵)`
+                        : `[挑戰] ${activeChallenge.studentName} 被 ${activeChallenge.monster.name} 攻擊了！(-3 HP)`;
+
+                    const updatedStudents = c.students.map(s => {
+                        if (s.id !== activeChallenge.studentId) return s;
+                        if (success) {
+                             // High Score Reward
+                             return { ...s, cp: s.cp + 50, gp: s.gp + 100, xp: s.xp + 30 };
+                        } else {
+                             // Penalty
+                             return { ...s, hp: Math.max(0, s.hp - 3) };
+                        }
+                    });
+                     return { ...c, students: updatedStudents, logs: [logMsg, ...c.logs] };
+                }));
+
+                // Reset challenge state explicitly to allow re-triggering
+                setIsChallengeModalOpen(false);
+                setTimeout(() => setActiveChallenge(null), 300); // Wait for modal animation to finish
             };
 
             const handleBuyItem = (item) => {
@@ -833,7 +905,7 @@
             const submitNewStudent = () => {
                 handleAdminCheck(() => {
                     if (!recruitName.trim()) return;
-                    setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: [...c.students, { id: Math.max(0, ...c.students.map(s => s.id)) + 1, name: recruitName, job: recruitJobId, lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 0, hp: MAX_HP, maxHp: MAX_HP, buffs: [], inventory: [] }], logs: [`[系統] ${recruitName} 加入`, ...c.logs] } : c));
+                    setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: [...c.students, { id: Math.max(0, ...c.students.map(s => s.id)) + 1, name: recruitName, job: recruitJobId, lv: 1, xp: 0, maxXp: 100, cp: 0, gp: 0, hp: MAX_HP, maxHp: MAX_HP, buffs: [], inventory: [], jobChangeCount: 0 }] } : c));
                     setRecruitName('');
                     setIsStudentModalOpen(false);
                 });
@@ -853,7 +925,23 @@
                 }
             };
 
-            const handleJobChange = () => { if (!targetStudent) return; setCourses(prev => prev.map(c => c.id === activeCourseId ? { ...c, students: c.students.map(s => s.id === targetStudent.id ? { ...s, job: newJobId } : s), logs: [`🔄 ${targetStudent.name} 轉職`, ...c.logs] } : c)); setIsJobChangeModalOpen(false); };
+            const handleJobChange = () => { 
+                if (!targetStudent) return; 
+                const currentCount = targetStudent.jobChangeCount || 0;
+                
+                if (currentCount >= 2) {
+                    showAlert("這位英雄已經轉職兩次，無法再變更職業了！");
+                    setIsJobChangeModalOpen(false);
+                    return;
+                }
+
+                setCourses(prev => prev.map(c => c.id === activeCourseId ? { 
+                    ...c, 
+                    students: c.students.map(s => s.id === targetStudent.id ? { ...s, job: newJobId, jobChangeCount: (s.jobChangeCount || 0) + 1 } : s), 
+                    logs: [`🔄 ${targetStudent.name} 轉職 (第 ${currentCount + 1}/2 次)`, ...c.logs] 
+                } : c)); 
+                setIsJobChangeModalOpen(false); 
+            };
 
             // NEW: Handle Edit Student
             const openEditStudentModal = (student, e) => {
@@ -875,7 +963,7 @@
                 setEditingStudent(null);
             };
 
-            // REMOVED early return: if (!activeCourse) return ...
+            if (!activeCourse) return <div className="p-10 text-white">載入中...</div>;
 
             return (
                 <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
@@ -1465,9 +1553,25 @@
                     {isJobChangeModalOpen && targetStudent && (
                         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                             <div className="bg-slate-800 rounded-2xl w-full max-w-lg p-6 border border-slate-600">
-                                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-white">轉職</h2><button onClick={() => setIsJobChangeModalOpen(false)}><X /></button></div>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-xl font-bold text-white">轉職</h2>
+                                    <div className="text-sm text-slate-400 bg-slate-900 px-3 py-1 rounded-full border border-slate-700">
+                                        剩餘次數: <span className={(targetStudent.jobChangeCount || 0) >= 2 ? "text-red-500" : "text-green-400"}>{2 - (targetStudent.jobChangeCount || 0)}</span>/2
+                                    </div>
+                                    <button onClick={() => setIsJobChangeModalOpen(false)}><X /></button>
+                                </div>
                                 <div className="grid grid-cols-2 gap-4">{JOB_DEFINITIONS.map(j => <button key={j.id} onClick={() => setNewJobId(j.id)} className={`p-4 border rounded ${newJobId === j.id ? 'bg-indigo-600/50 border-indigo-500' : 'border-slate-600'}`}><div>{j.icon} {j.name}</div></button>)}</div>
-                                <button onClick={handleJobChange} className="w-full bg-indigo-600 py-2 rounded text-white font-bold mt-4">確認</button>
+                                <button 
+                                    onClick={handleJobChange} 
+                                    disabled={(targetStudent.jobChangeCount || 0) >= 2}
+                                    className={`w-full py-2 rounded text-white font-bold mt-4 ${
+                                        (targetStudent.jobChangeCount || 0) >= 2 
+                                        ? "bg-slate-600 cursor-not-allowed text-slate-400" 
+                                        : "bg-indigo-600 hover:bg-indigo-500"
+                                    }`}
+                                >
+                                    {(targetStudent.jobChangeCount || 0) >= 2 ? "轉職次數已達上限" : "確認"}
+                                </button>
                             </div>
                         </div>
                     )}
@@ -1547,6 +1651,40 @@
                                 <div className="flex gap-3 mt-8">
                                     <button onClick={() => setIsEditStudentModalOpen(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold">取消</button>
                                     <button onClick={handleSaveStudentEdit} className="flex-1 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 font-bold">儲存修改</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* NEW: Random Challenge Modal */}
+                    {isChallengeModalOpen && activeChallenge && (
+                        <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center p-4 animate-fadeIn">
+                            <div className="bg-slate-900 border-2 border-red-500 rounded-2xl w-full max-w-lg p-8 shadow-[0_0_50px_rgba(220,38,38,0.5)] relative overflow-hidden text-center">
+                                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')] opacity-10 pointer-events-none"></div>
+                                
+                                <div className="text-6xl mb-4 animate-bounce-slow">{activeChallenge.monster.icon}</div>
+                                <h2 className="text-3xl font-black text-red-500 mb-2 animate-pulse">野生的小怪跳出來了！</h2>
+                                <p className="text-xl text-white font-bold mb-4">{activeChallenge.monster.name}</p>
+                                <div className="bg-slate-800/80 p-4 rounded-lg border border-slate-600 mb-6">
+                                    <p className="text-slate-300 mb-2 text-sm">{activeChallenge.monster.desc}</p>
+                                    <p className="text-lg text-yellow-400 font-bold">
+                                        請 <span className="text-white text-xl border-b-2 border-yellow-500">{activeChallenge.studentName}</span> 回答老師的問題！
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <button 
+                                        onClick={() => handleChallengeResolve(true)}
+                                        className="py-4 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold text-lg shadow-lg border-b-4 border-green-800 active:border-b-0 active:translate-y-1 transition-all"
+                                    >
+                                        ✅ 回答正確 (Critical Hit!)
+                                    </button>
+                                    <button 
+                                        onClick={() => handleChallengeResolve(false)}
+                                        className="py-4 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-lg shadow-lg border-b-4 border-red-800 active:border-b-0 active:translate-y-1 transition-all"
+                                    >
+                                        ❌ 回答錯誤 (Miss...)
+                                    </button>
                                 </div>
                             </div>
                         </div>
