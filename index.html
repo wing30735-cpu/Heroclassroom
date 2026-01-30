@@ -797,9 +797,13 @@
                 setCourses(prev => prev.map(c => {
                     if (c.id !== activeCourseId) return c;
                     
-                    const logMsg = success 
-                        ? `[挑戰] ${activeChallenge.studentName} 成功回答了 ${activeChallenge.monster.name} 的問題！(大獎勵)`
-                        : `[挑戰] ${activeChallenge.studentName} 被 ${activeChallenge.monster.name} 攻擊了！(-3 HP)`;
+                    let logMsg;
+                    if (success) {
+                        logMsg = `[挑戰] ${activeChallenge.studentName} 成功回答了 ${activeChallenge.monster.name} 的問題！(大獎勵)`;
+                    } else {
+                        // Updated log message to reflect boss healing
+                        logMsg = `[挑戰] ${activeChallenge.studentName} 答錯了！受到攻擊(-3 HP) 且魔王藉機回復了生命(-30 CP)`;
+                    }
 
                     const updatedStudents = c.students.map(s => {
                         if (s.id !== activeChallenge.studentId) return s;
@@ -807,8 +811,12 @@
                              // High Score Reward
                              return { ...s, cp: s.cp + 50, gp: s.gp + 100, xp: s.xp + 30 };
                         } else {
-                             // Penalty
-                             return { ...s, hp: Math.max(0, s.hp - 3) };
+                             // Penalty: HP damage AND Boss Heal (via CP reduction)
+                             return { 
+                                 ...s, 
+                                 hp: Math.max(0, s.hp - 3),
+                                 cp: Math.max(0, s.cp - 30) // Deducting CP effectively heals the boss
+                             };
                         }
                     });
                      return { ...c, students: updatedStudents, logs: [logMsg, ...c.logs] };
