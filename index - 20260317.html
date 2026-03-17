@@ -475,7 +475,8 @@
                     bossId: 'slime',
                     bossReward: '全班免作業一次',
                     isBossDefeated: false,
-                    shopItems: JSON.parse(JSON.stringify(INITIAL_SHOP_ITEMS))
+                    shopItems: JSON.parse(JSON.stringify(INITIAL_SHOP_ITEMS)),
+                    challengeCooldown: 0
                 }
             ];
 
@@ -722,9 +723,9 @@
                 }
 
                 // 2. Determine random challenge synchronously
-                // Trigger only if boss is alive and random chance met (25% chance)
-                // Also added check to ensure we don't trigger if already active
-                const triggerChallenge = !currentCourse.isBossDefeated && Math.random() < 0.25 && !activeChallenge;
+                const currentCooldown = currentCourse.challengeCooldown || 0;
+                // Trigger only if boss is alive, cooldown is zero, and random chance met (35% chance)
+                const triggerChallenge = !currentCourse.isBossDefeated && currentCooldown <= 0 && Math.random() < 0.35 && !activeChallenge;
 
                 // 3. Update State for Quest Completion (Standard Rewards)
                 setCourses(prev => prev.map(course => {
@@ -778,7 +779,15 @@
                         newLogs = [`[${time}] 🏆 ${currentBoss.name} 被擊敗了！`, ...newLogs];
                     }
 
-                    return { ...course, students: updatedStudents, logs: newLogs, isBossDefeated: course.isBossDefeated || bossDefeatedNow };
+                    // Update cooldown
+                    let newCooldown = course.challengeCooldown || 0;
+                    if (triggerChallenge) {
+                        newCooldown = 4; // Enter cooldown for 4 turns
+                    } else if (newCooldown > 0) {
+                        newCooldown -= 1; // Decrease cooldown
+                    }
+
+                    return { ...course, students: updatedStudents, logs: newLogs, isBossDefeated: course.isBossDefeated || bossDefeatedNow, challengeCooldown: newCooldown };
                 }));
 
                 // 4. Open Challenge Modal if triggered
@@ -859,7 +868,7 @@
             const handleAddCourse = () => {
                 handleAdminCheck(() => {
                     if (!newCourseName.trim()) return;
-                    setCourses([...courses, { id: `course-${Date.now()}`, name: newCourseName, icon: 'Map', students: [], logs: [`[系統] 副本建立`], bossId: 'slime', bossReward: '神秘獎勵', isBossDefeated: false, shopItems: JSON.parse(JSON.stringify(INITIAL_SHOP_ITEMS)) }]);
+                    setCourses([...courses, { id: `course-${Date.now()}`, name: newCourseName, icon: 'Map', students: [], logs: [`[系統] 副本建立`], bossId: 'slime', bossReward: '神秘獎勵', isBossDefeated: false, shopItems: JSON.parse(JSON.stringify(INITIAL_SHOP_ITEMS)), challengeCooldown: 0 }]);
                     setActiveCourseId(`course-${Date.now()}`);
                     setNewCourseName('');
                 });
