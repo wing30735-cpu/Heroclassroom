@@ -416,7 +416,7 @@
                 { id: 'skeleton_king', name: '骷髏王', hp: 900, avatar: '💀', desc: '來自冥界的不死君王，考驗隊伍的持久力。', difficulty: 'HARD' },
                 { id: 'dragon', name: '深淵魔龍', hp: 1200, avatar: '🐉', desc: '終極夢魘，唯有傳奇英雄班級能擊敗！', difficulty: 'HARD' },
                 { id: 'gargoyle', name: '石像鬼守衛', hp: 1500, avatar: '🗿', desc: '擁有極高防禦力的空中單位，需要強大火力。', difficulty: 'EXPERT' },
-                { id: 'dark_wizard', name: '黑暗大法師', hp: 1800, avatar: '🧙‍♂️', desc: '擅長群體魔法，考驗團隊的智慧與反應。', difficulty: 'EXPERT' },
+                { id: 'dark_wizard', name: '黑暗大法师', hp: 1800, avatar: '🧙‍♂️', desc: '擅長群體魔法，考驗團隊的智慧與反應。', difficulty: 'EXPERT' },
                 { id: 'kraken', name: '深海巨怪', hp: 2200, avatar: '🐙', desc: '來自深淵的恐懼，血量深不可測。', difficulty: 'MASTER' },
                 { id: 'mecha_titan', name: '機械巨神', hp: 2500, avatar: '🤖', desc: '科技與魔法的結晶，擁有毀滅性的力量。', difficulty: 'MASTER' },
                 { id: 'demon', name: '期末大魔王', hp: 3000, avatar: '👿', desc: '學期的最終考驗，戰勝它來獲得寒暑假！', difficulty: 'EPIC' },
@@ -722,9 +722,9 @@
                 }
 
                 // 2. Determine random challenge synchronously
-                // Trigger only if boss is alive and random chance met (15% chance)
+                // Trigger only if boss is alive and random chance met (25% chance)
                 // Also added check to ensure we don't trigger if already active
-                const triggerChallenge = !currentCourse.isBossDefeated && Math.random() < 0.15 && !activeChallenge;
+                const triggerChallenge = !currentCourse.isBossDefeated && Math.random() < 0.25 && !activeChallenge;
 
                 // 3. Update State for Quest Completion (Standard Rewards)
                 setCourses(prev => prev.map(course => {
@@ -971,7 +971,7 @@
                 setEditingStudent(null);
             };
 
-            if (!activeCourse) return <div className="p-10 text-white">載入中...</div>;
+            // REMOVED early return: if (!activeCourse) return ...
 
             return (
                 <div className="flex h-screen bg-slate-900 text-slate-100 font-sans overflow-hidden">
